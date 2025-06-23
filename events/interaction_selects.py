@@ -24,18 +24,8 @@ class InteractionSelects(commands.Cog):
                     if 'values' in select_data and select_data['values']:
                         selected_tipo = select_data['values'][0]
                         print(f"Tipo seleccionado: {selected_tipo}")
-                        set_user_state(user_id, {"type": "caso", "paso": 2, "tipoSolicitud": selected_tipo, "interactionId": interaction.id})
-                        # Mostrar botón para completar detalles
-                        button = discord.ui.Button(label="Completar Detalles del Caso", custom_id="completeCasoDetailsButton", style=discord.ButtonStyle.primary)
-                        view = discord.ui.View()
-                        view.add_item(button)
-                        print(f"Botón creado y agregado a la vista")
-                        await interaction.followup.send(
-                            content=f"Tipo de Solicitud seleccionado: **{selected_tipo}**. Haz clic en el botón para completar los detalles.",
-                            view=view,
-                            ephemeral=True
-                        )
-                        print(f"Mensaje enviado con botón")
+                        await interaction.response.send_message("Test respuesta select", ephemeral=True)
+                        return
                     else:
                         raise ValueError("No se encontraron valores en la selección")
                 except (KeyError, IndexError, ValueError) as e:
