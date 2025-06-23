@@ -105,7 +105,7 @@ class InteractionCommands(commands.Cog):
             await interaction.response.send_message(
                 content='Por favor, selecciona el tipo de solicitud:',
                 view=view,
-                ephemeral=True
+                ephemeral=False
             )
             print(f"Usuario {interaction.user} puesto en estado pendiente (caso, paso 1). Select Menu mostrado.")
         except Exception as error:
