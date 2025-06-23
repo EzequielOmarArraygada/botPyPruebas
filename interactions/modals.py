@@ -36,6 +36,12 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             required=False,
             max_length=1000
         )
+        
+        # Agregar los componentes al modal
+        self.add_item(self.pedido)
+        self.add_item(self.caso)
+        self.add_item(self.email)
+        self.add_item(self.descripcion)
 
     async def on_submit(self, interaction: discord.Interaction):
         # Los datos se procesarán en interaction_selects.py
@@ -71,6 +77,11 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             required=True,
             max_length=1000
         )
+        
+        # Agregar los componentes al modal
+        self.add_item(self.pedido)
+        self.add_item(self.numero_caso)
+        self.add_item(self.datos_contacto)
 
     async def on_submit(self, interaction: discord.Interaction):
         # Los datos se procesarán en interaction_selects.py
