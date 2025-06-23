@@ -25,7 +25,6 @@ def build_tipo_solicitud_select_menu():
                 custom_id='casoTipoSolicitudSelect'
             )
 
-
     class TipoSolicitudView(discord.ui.View):
         def __init__(self):
             super().__init__()

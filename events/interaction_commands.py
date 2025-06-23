@@ -49,6 +49,13 @@ class InteractionCommands(commands.Cog):
         try:
             tracking_data = get_andreani_tracking(tracking_number, config.ANDREANI_AUTH_HEADER)
             
+            # Enviar el JSON por DM al usuario para debug
+            import json
+            try:
+                await interaction.user.send(f"DEBUG JSON:\n```json\n{json.dumps(tracking_data, indent=2)[:1900]}\n```")
+            except Exception as dm_error:
+                print(f"No se pudo enviar el JSON por DM: {dm_error}")
+            
             # Formatear la respuesta con más información
             if tracking_data and 'procesoActual' in tracking_data:
                 proceso = tracking_data['procesoActual'].get('titulo', 'Sin datos')
