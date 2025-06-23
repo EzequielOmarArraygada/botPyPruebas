@@ -69,7 +69,7 @@ class InteractionCommands(commands.Cog):
                             # Formatear fecha a dd/mm/yyyy HH:MM
                             try:
                                 dt = datetime.fromisoformat(fecha_iso)
-                                fecha_fmt = dt.strftime('%d/%m/%Y %H:%M')
+                                fecha_fmt = dt.strftime('%d/%m/%Y, %H:%M')
                             except Exception:
                                 fecha_fmt = fecha_iso
                             desc = clean_html(traduccion.get('traduccion', ''))
