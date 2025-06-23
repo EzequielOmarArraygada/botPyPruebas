@@ -30,11 +30,12 @@ class InteractionSelects(commands.Cog):
                         view = discord.ui.View()
                         view.add_item(button)
                         print(f"Botón creado y agregado a la vista")
-                        await interaction.response.edit_message(
+                        await interaction.followup.send(
                             content=f"Tipo de Solicitud seleccionado: **{selected_tipo}**. Haz clic en el botón para completar los detalles.",
-                            view=view
+                            view=view,
+                            ephemeral=True
                         )
-                        print(f"Mensaje editado con botón")
+                        print(f"Mensaje enviado con botón")
                     else:
                         raise ValueError("No se encontraron valores en la selección")
                 except (KeyError, IndexError, ValueError) as e:
