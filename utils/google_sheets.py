@@ -98,7 +98,12 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         if not guild:
             print(f"Error: No se pudo encontrar el servidor de Discord con ID {guild_id}.")
             return
-        await guild.fetch_members().flatten()
+        # Obtener todos los miembros del guild
+        try:
+            members = [member async for member in guild.fetch_members()]
+        except Exception:
+            members = guild.members  # fallback si ya están en caché
+        
         for i, row in enumerate(rows[1:], start=2):
             error_column_index = 9  # Columna J
             notified_column_index = 10  # Columna K
@@ -112,8 +117,7 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                 tipo_solicitud = row[4] if len(row) > 4 else 'N/A'
                 datos_contacto = row[5] if len(row) > 5 else 'N/A'
                 mention = agente_name
-                found_member = discord.utils.get(guild.members, display_name=agente_name) or \
-                              discord.utils.get(guild.members, name=agente_name)
+                found_member = next((m for m in members if m.display_name == agente_name or m.name == agente_name), None)
                 if found_member:
                     mention = f'<@{found_member.id}>'
                 notification_message = (
