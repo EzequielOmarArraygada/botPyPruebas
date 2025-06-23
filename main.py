@@ -60,6 +60,9 @@ async def check_errors():
     if sheets_instance:
         try:
             # Verificar que las configuraciones necesarias estén disponibles
+            if not config.SPREADSHEET_ID_CASOS:
+                print("Error: SPREADSHEET_ID_CASOS no está configurado")
+                return
             if not config.SHEET_RANGE_CASOS_READ:
                 print("Error: SHEET_RANGE_CASOS_READ no está configurado")
                 return
@@ -70,9 +73,22 @@ async def check_errors():
                 print("Error: GUILD_ID no está configurado")
                 return
                 
+            # Obtener la hoja específica
+            try:
+                spreadsheet = sheets_instance.open_by_key(config.SPREADSHEET_ID_CASOS)
+                # Usar la primera hoja si no hay una específica configurada
+                sheet_name = getattr(config, 'SHEET_NAME_CASOS', None)
+                if sheet_name:
+                    sheet = spreadsheet.worksheet(sheet_name)
+                else:
+                    sheet = spreadsheet.sheet1
+            except Exception as sheet_error:
+                print(f"Error al abrir la hoja de casos: {sheet_error}")
+                return
+                
             await check_sheet_for_errors(
                 bot, 
-                sheets_instance, 
+                sheet, 
                 config.SHEET_RANGE_CASOS_READ, 
                 int(config.TARGET_CHANNEL_ID_CASOS), 
                 int(config.GUILD_ID)

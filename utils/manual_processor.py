@@ -20,8 +20,22 @@ async def load_and_cache_manual(drive_instance, file_id: str) -> None:
         # Obtener el archivo desde Google Drive usando la API moderna
         file_content = download_file_from_drive(drive_instance, file_id)
         
-        # Decodificar el contenido como texto UTF-8
-        _manual_cache = file_content.decode('utf-8')
+        # Intentar diferentes codificaciones
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        _manual_cache = None
+        
+        for encoding in encodings:
+            try:
+                _manual_cache = file_content.decode(encoding)
+                print(f"Manual decodificado exitosamente con {encoding}")
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if _manual_cache is None:
+            # Si ninguna codificación funciona, usar 'ignore' para saltar caracteres problemáticos
+            _manual_cache = file_content.decode('utf-8', errors='ignore')
+            print("Manual decodificado con 'ignore' (algunos caracteres pueden haberse perdido)")
         
         # Obtener metadata del archivo
         file_metadata = drive_instance.files().get(fileId=file_id, fields='title,modifiedDate,size').execute()
