@@ -57,35 +57,47 @@ class InteractionCommands(commands.Cog):
                 print(f"No se pudo enviar el JSON por DM: {dm_error}")
             
             # Formatear la respuesta con más información
-            if tracking_data and 'procesoActual' in tracking_data:
-                proceso = tracking_data['procesoActual'].get('titulo', 'Sin datos')
-                fecha_proceso = tracking_data['procesoActual'].get('fecha', 'Sin fecha')
-                
-                # Construir mensaje con más detalles
+            if tracking_data:
+                info = tracking_data
                 tracking_info = f"📦 **Tracking: {tracking_number}**\n\n"
-                tracking_info += f"**Estado Actual:** {proceso}\n"
-                tracking_info += f"**Fecha:** {fecha_proceso}\n\n"
-                
-                # Agregar historial si está disponible
-                if 'historial' in tracking_data and tracking_data['historial']:
-                    tracking_info += "**📋 Historial de Estados:**\n"
-                    for i, evento in enumerate(tracking_data['historial'][:5], 1):  # Mostrar últimos 5 eventos
+                # Estado actual
+                if 'procesoActual' in info:
+                    proceso = info['procesoActual'].get('titulo', 'Sin datos')
+                    obs = info['procesoActual'].get('observaciones', '')
+                    tracking_info += f"**Estado Actual:** {proceso}\n"
+                    if obs:
+                        tracking_info += f"**Observaciones:** {obs}\n"
+                # Fecha estimada de entrega
+                if 'fechaEstimadaDeEntrega' in info:
+                    tracking_info += f"**Fecha estimada/entrega:** {info['fechaEstimadaDeEntrega']}\n"
+                # Remitente
+                if 'nombreRemitente' in info:
+                    tracking_info += f"**Remitente:** {info['nombreRemitente']}\n"
+                # Cliente
+                if 'cliente' in info and info['cliente']:
+                    cliente = info['cliente']
+                    nombre_cliente = cliente.get('nombre', '')
+                    cuit = cliente.get('cuit', '')
+                    if nombre_cliente:
+                        tracking_info += f"**Cliente:** {nombre_cliente}"
+                        if cuit:
+                            tracking_info += f" (CUIT: {cuit})"
+                        tracking_info += "\n"
+                # Preguntas frecuentes
+                if 'procesoActual' in info and info['procesoActual'].get('preguntasFrecuentes'):
+                    faq = info['procesoActual']['preguntasFrecuentes'][0]
+                    pregunta = faq.get('pregunta', '')
+                    respuesta = faq.get('respuesta', '')
+                    tracking_info += f"\n❓ **FAQ:** {pregunta}\n{respuesta}\n"
+                # Historial (si existiera)
+                if 'historial' in info and info['historial']:
+                    tracking_info += "\n**📋 Historial de Estados:**\n"
+                    for i, evento in enumerate(info['historial'][:5], 1):
                         titulo = evento.get('titulo', 'Sin título')
                         fecha = evento.get('fecha', 'Sin fecha')
                         tracking_info += f"{i}. **{titulo}** - {fecha}\n"
                 else:
-                    tracking_info += "**📋 Historial:** No disponible\n"
-                
-                # Agregar información adicional si está disponible
-                if 'datosEnvio' in tracking_data:
-                    datos = tracking_data['datosEnvio']
-                    if 'destinatario' in datos:
-                        tracking_info += f"\n**👤 Destinatario:** {datos['destinatario']}\n"
-                    if 'origen' in datos:
-                        tracking_info += f"**📍 Origen:** {datos['origen']}\n"
-                    if 'destino' in datos:
-                        tracking_info += f"**🎯 Destino:** {datos['destino']}\n"
-                        
+                    tracking_info += "\n**📋 Historial:** No disponible\n"
             else:
                 tracking_info = f"😕 No se pudo encontrar la información de tracking para **{tracking_number}**."
                 
