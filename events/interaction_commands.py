@@ -49,10 +49,36 @@ class InteractionCommands(commands.Cog):
         try:
             tracking_data = get_andreani_tracking(tracking_number, config.ANDREANI_AUTH_HEADER)
             
-            # Formatear la respuesta
+            # Formatear la respuesta con más información
             if tracking_data and 'procesoActual' in tracking_data:
                 proceso = tracking_data['procesoActual'].get('titulo', 'Sin datos')
-                tracking_info = f"📦 Estado del tracking **{tracking_number}**: {proceso}"
+                fecha_proceso = tracking_data['procesoActual'].get('fecha', 'Sin fecha')
+                
+                # Construir mensaje con más detalles
+                tracking_info = f"📦 **Tracking: {tracking_number}**\n\n"
+                tracking_info += f"**Estado Actual:** {proceso}\n"
+                tracking_info += f"**Fecha:** {fecha_proceso}\n\n"
+                
+                # Agregar historial si está disponible
+                if 'historial' in tracking_data and tracking_data['historial']:
+                    tracking_info += "**📋 Historial de Estados:**\n"
+                    for i, evento in enumerate(tracking_data['historial'][:5], 1):  # Mostrar últimos 5 eventos
+                        titulo = evento.get('titulo', 'Sin título')
+                        fecha = evento.get('fecha', 'Sin fecha')
+                        tracking_info += f"{i}. **{titulo}** - {fecha}\n"
+                else:
+                    tracking_info += "**📋 Historial:** No disponible\n"
+                
+                # Agregar información adicional si está disponible
+                if 'datosEnvio' in tracking_data:
+                    datos = tracking_data['datosEnvio']
+                    if 'destinatario' in datos:
+                        tracking_info += f"\n**👤 Destinatario:** {datos['destinatario']}\n"
+                    if 'origen' in datos:
+                        tracking_info += f"**📍 Origen:** {datos['origen']}\n"
+                    if 'destino' in datos:
+                        tracking_info += f"**🎯 Destino:** {datos['destino']}\n"
+                        
             else:
                 tracking_info = f"😕 No se pudo encontrar la información de tracking para **{tracking_number}**."
                 
