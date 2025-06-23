@@ -96,5 +96,5 @@ class Modals(commands.Cog):
         modal = CasoModal()
         await ctx.send_modal(modal)
 
-def setup(bot):
-    bot.add_cog(Modals(bot)) 
+async def setup(bot):
+    await bot.add_cog(Modals(bot)) 

@@ -39,7 +39,5 @@ class SelectMenus(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-
-
-def setup(bot):
-    bot.add_cog(SelectMenus(bot)) 
+async def setup(bot):
+    await bot.add_cog(SelectMenus(bot)) 

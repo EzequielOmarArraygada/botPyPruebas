@@ -3,6 +3,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import pytz
 import discord
+import json
 
 def initialize_google_sheets(credentials_json: str):
     try:
@@ -10,10 +11,17 @@ def initialize_google_sheets(credentials_json: str):
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        credentials = Credentials.from_service_account_info(
-            eval(credentials_json) if isinstance(credentials_json, str) else credentials_json,
-            scopes=scopes
-        )
+        
+        # Validar que credentials_json sea un JSON válido
+        try:
+            if isinstance(credentials_json, str):
+                creds_dict = json.loads(credentials_json)
+            else:
+                creds_dict = credentials_json
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Error al parsear credenciales JSON: {e}")
+        
+        credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(credentials)
         print("Instancia de Google Sheets inicializada.")
         return client

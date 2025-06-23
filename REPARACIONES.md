@@ -35,6 +35,22 @@
 - **Solución**: Descomentado y mejorado el código en `main.py`
 - **Funcionalidad**: El manual se carga automáticamente al iniciar el bot
 
+### 7. Errores de Async/Await Reparados ⚡ NUEVO
+- **Problema**: Errores "coroutine 'BotBase.add_cog' was never awaited" en varios archivos
+- **Solución**: Convertidas las funciones `setup()` a `async def setup()` en:
+  - `events/guild_member_add.py`
+  - `interactions/modals.py`
+  - `interactions/select_menus.py`
+- **Funcionalidad**: Las extensiones ahora se cargan correctamente sin errores
+
+### 8. Validación de Credenciales de Google Mejorada ⚡ NUEVO
+- **Problema**: Error "'{' was never closed" en las credenciales de Google
+- **Solución**: 
+  - Agregada validación JSON en `config.py`
+  - Mejorado manejo de errores en `utils/google_sheets.py` y `utils/google_drive.py`
+  - Creado script `check_google_creds.py` para verificar formato
+- **Funcionalidad**: Mejor detección de errores en las credenciales de Google
+
 ## 🆕 Nuevas Funcionalidades Agregadas
 
 ### 1. Script de Diagnóstico
@@ -45,6 +61,11 @@
 ### 2. Archivo de Configuración de Ejemplo
 - **Archivo**: `config.example.py`
 - **Funcionalidad**: Muestra todas las variables de entorno necesarias
+
+### 3. Verificador de Credenciales de Google ⚡ NUEVO
+- **Archivo**: `check_google_creds.py`
+- **Funcionalidad**: Verifica el formato de las credenciales de Google
+- **Uso**: `python check_google_creds.py`
 
 ## 🔧 Comandos Disponibles
 
@@ -89,12 +110,17 @@
 python diagnostic.py
 ```
 
-### 2. Desplegar Comandos
+### 2. Verificar Credenciales de Google ⚡ NUEVO
+```bash
+python check_google_creds.py
+```
+
+### 3. Desplegar Comandos
 ```bash
 python deploy_commands.py
 ```
 
-### 3. Ejecutar el Bot
+### 4. Ejecutar el Bot
 ```bash
 python main.py
 ```
@@ -105,6 +131,7 @@ python main.py
 2. **APIs de Google**: Necesitas habilitar Google Sheets API y Google Drive API
 3. **Cuenta de Servicio**: Usa una cuenta de servicio de Google Cloud Platform
 4. **Archivo del Manual**: El archivo debe estar en formato de texto plano en Google Drive
+5. **Formato JSON**: Las credenciales de Google deben estar en formato JSON válido ⚡ NUEVO
 
 ## 🔍 Solución de Problemas
 
@@ -119,18 +146,24 @@ python main.py
 3. Asegúrate de que el bot tenga permisos de aplicación
 
 ### Si hay errores de Google:
-1. Verifica que las credenciales JSON sean válidas
-2. Asegúrate de que las APIs estén habilitadas
-3. Verifica que los IDs de las hojas sean correctos
+1. Ejecuta `python check_google_creds.py` para verificar el formato ⚡ NUEVO
+2. Verifica que las credenciales JSON sean válidas
+3. Asegúrate de que las APIs estén habilitadas
+4. Verifica que los IDs de las hojas sean correctos
 
 ### Si el comando /manual no funciona:
 1. Verifica que `GEMINI_API_KEY` esté configurado
 2. Verifica que `MANUAL_DRIVE_FILE_ID` esté configurado
 3. Asegúrate de que el archivo del manual sea accesible
 
+### Si hay errores de async/await: ⚡ NUEVO
+1. Asegúrate de que todas las funciones `setup()` sean `async def setup()`
+2. Verifica que se use `await bot.add_cog()` en lugar de `bot.add_cog()`
+
 ## 📞 Soporte
 
 Si encuentras problemas adicionales:
 1. Revisa los logs del bot
 2. Ejecuta el script de diagnóstico
-3. Verifica la configuración de las variables de entorno 
+3. Ejecuta el verificador de credenciales de Google
+4. Verifica la configuración de las variables de entorno 

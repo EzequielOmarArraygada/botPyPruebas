@@ -51,6 +51,16 @@ if not GUILD_ID:
 if not GOOGLE_CREDENTIALS_JSON:
     print("Error CRÍTICO: La variable de entorno GOOGLE_CREDENTIALS_JSON no está configurada.")
     exit(1)
+else:
+    # Validar formato JSON
+    try:
+        import json
+        json.loads(GOOGLE_CREDENTIALS_JSON)
+        print("✅ GOOGLE_CREDENTIALS_JSON tiene formato JSON válido")
+    except json.JSONDecodeError as e:
+        print(f"Error CRÍTICO: GOOGLE_CREDENTIALS_JSON no es un JSON válido: {e}")
+        print("Verifica que el JSON esté correctamente formateado y que no falten llaves o comillas.")
+        exit(1)
 
 if not GEMINI_API_KEY:
     print("Advertencia: GEMINI_API_KEY no configurada. El comando del manual no funcionará.")

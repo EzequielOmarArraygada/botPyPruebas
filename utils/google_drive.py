@@ -3,14 +3,22 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import requests
 import io
+import json
 
 def initialize_google_drive(credentials_json: str):
     try:
         scopes = ['https://www.googleapis.com/auth/drive']
-        credentials = Credentials.from_service_account_info(
-            eval(credentials_json) if isinstance(credentials_json, str) else credentials_json,
-            scopes=scopes
-        )
+        
+        # Validar que credentials_json sea un JSON válido
+        try:
+            if isinstance(credentials_json, str):
+                creds_dict = json.loads(credentials_json)
+            else:
+                creds_dict = credentials_json
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Error al parsear credenciales JSON: {e}")
+        
+        credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         drive_service = build('drive', 'v3', credentials=credentials)
         print("Instancia de Google Drive inicializada.")
         return drive_service
