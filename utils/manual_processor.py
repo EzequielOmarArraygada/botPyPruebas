@@ -1,5 +1,6 @@
 import asyncio
 from typing import Optional, Dict, Any
+from utils.google_drive import download_file_from_drive
 
 # Cache global para el manual
 _manual_cache: Optional[str] = None
@@ -16,19 +17,20 @@ async def load_and_cache_manual(drive_instance, file_id: str) -> None:
     global _manual_cache, _manual_metadata
     
     try:
-        # Obtener el archivo desde Google Drive
-        file = drive_instance.CreateFile({'id': file_id})
-        file.GetContentFile('temp_manual.txt')
+        # Obtener el archivo desde Google Drive usando la API moderna
+        file_content = download_file_from_drive(drive_instance, file_id)
         
-        # Leer el contenido
-        with open('temp_manual.txt', 'r', encoding='utf-8') as f:
-            _manual_cache = f.read()
+        # Decodificar el contenido como texto UTF-8
+        _manual_cache = file_content.decode('utf-8')
+        
+        # Obtener metadata del archivo
+        file_metadata = drive_instance.files().get(fileId=file_id, fields='title,modifiedDate,size').execute()
         
         # Guardar metadata
         _manual_metadata = {
             'file_id': file_id,
-            'title': file['title'],
-            'last_modified': file['modifiedDate'],
+            'title': file_metadata.get('title', 'Manual'),
+            'last_modified': file_metadata.get('modifiedDate'),
             'size': len(_manual_cache)
         }
         
@@ -37,14 +39,6 @@ async def load_and_cache_manual(drive_instance, file_id: str) -> None:
     except Exception as e:
         print(f"Error al cargar el manual: {e}")
         raise
-    finally:
-        # Limpiar archivo temporal
-        try:
-            import os
-            if os.path.exists('temp_manual.txt'):
-                os.remove('temp_manual.txt')
-        except:
-            pass
 
 def get_manual_text() -> Optional[str]:
     """

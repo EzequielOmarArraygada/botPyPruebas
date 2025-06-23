@@ -3,7 +3,7 @@ from discord.ext import commands
 
 class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
     def __init__(self):
-        super().__init__()
+        super().__init__(custom_id='facturaAModal')
         self.pedido = discord.ui.TextInput(
             label="Número de Pedido",
             placeholder="Ingresa el número de pedido...",
@@ -38,7 +38,7 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
         )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Aquí puedes procesar los datos del modal
+        # Los datos se procesarán en interaction_selects.py
         await interaction.response.send_message(
             f"Modal enviado:\nPedido: {self.pedido.value}\nCaso: {self.caso.value}\nEmail: {self.email.value}\nDescripción: {self.descripcion.value}",
             ephemeral=True
@@ -46,7 +46,7 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
 
 class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
     def __init__(self):
-        super().__init__()
+        super().__init__(custom_id='casoModal')
         self.pedido = discord.ui.TextInput(
             label="Número de Pedido",
             placeholder="Ingresa el número de pedido...",
@@ -73,7 +73,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
         )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Aquí puedes procesar los datos del modal
+        # Los datos se procesarán en interaction_selects.py
         await interaction.response.send_message(
             f"Modal enviado:\nPedido: {self.pedido.value}\nNúmero de Caso: {self.numero_caso.value}\nDatos de Contacto: {self.datos_contacto.value}",
             ephemeral=True

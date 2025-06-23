@@ -95,13 +95,16 @@ def download_file_from_drive(drive_service, file_id: str) -> bytes:
         print(f"Intentando descargar archivo con ID: {file_id}")
         request = drive_service.files().get_media(fileId=file_id)
         fh = io.BytesIO()
-        downloader = MediaIoBaseUpload(fh, mimetype=None)
-        # Usamos next_chunk para descargar el archivo completo
+        
+        # Usamos MediaIoBaseDownload para descargar el archivo completo
         from googleapiclient.http import MediaIoBaseDownload
         downloader = MediaIoBaseDownload(fh, request)
         done = False
         while not done:
             status, done = downloader.next_chunk()
+            if status:
+                print(f"Descargado {int(status.progress() * 100)}%")
+        
         fh.seek(0)
         return fh.read()
     except Exception as error:
