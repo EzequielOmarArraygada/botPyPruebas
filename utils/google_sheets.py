@@ -73,6 +73,19 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
     """
     print('Iniciando verificación de errores en Google Sheets...')
     try:
+        # Limpiar el rango si tiene formato incorrecto
+        if '!' in sheet_range:
+            # Si el rango tiene formato 'SheetName!Range', extraer solo el rango
+            parts = sheet_range.split('!')
+            if len(parts) >= 2:
+                sheet_range = parts[-1]  # Tomar la última parte como rango
+                print(f"Rango limpiado de '{sheet_range}' a '{sheet_range}'")
+        
+        # Validar formato del rango
+        if not sheet_range or ':' not in sheet_range:
+            print(f"Error: Rango inválido '{sheet_range}'. Debe tener formato 'A:K'")
+            return
+        
         rows = sheet.get(sheet_range)
         if not rows or len(rows) <= 1:
             print('No hay datos de casos en la hoja para verificar.')
@@ -128,6 +141,8 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         print('Verificación de errores en Google Sheets completada.')
     except Exception as error:
         print('Error al leer la hoja de Google Sheets para verificar errores:', error)
+        print(f'Rango utilizado: {sheet_range}')
+        print('Sugerencia: Verifica que el rango tenga formato correcto (ej: A:K)')
 
 def funcion_google_sheets():
     pass 

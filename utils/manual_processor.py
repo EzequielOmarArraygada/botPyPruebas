@@ -38,12 +38,12 @@ async def load_and_cache_manual(drive_instance, file_id: str) -> None:
             print("Manual decodificado con 'ignore' (algunos caracteres pueden haberse perdido)")
         
         # Obtener metadata del archivo
-        file_metadata = drive_instance.files().get(fileId=file_id, fields='title,modifiedDate,size').execute()
+        file_metadata = drive_instance.files().get(fileId=file_id, fields='name,modifiedDate,size').execute()
         
         # Guardar metadata
         _manual_metadata = {
             'file_id': file_id,
-            'title': file_metadata.get('title', 'Manual'),
+            'title': file_metadata.get('name', 'Manual'),
             'last_modified': file_metadata.get('modifiedDate'),
             'size': len(_manual_cache)
         }
