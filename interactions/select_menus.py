@@ -25,8 +25,6 @@ def build_tipo_solicitud_select_menu():
                 custom_id='casoTipoSolicitudSelect'
             )
 
-        async def callback(self, interaction: discord.Interaction):
-            await interaction.response.send_message(f'Seleccionaste: {self.values[0]}', ephemeral=True)
 
     class TipoSolicitudView(discord.ui.View):
         def __init__(self):

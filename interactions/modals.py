@@ -44,9 +44,7 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
         self.add_item(self.descripcion)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Los datos se procesarán en interaction_selects.py
-        # No hacer nada aquí para que se maneje en el evento de interacción
-        pass
+        await interaction.response.defer(thinking=True)
 
 class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
     def __init__(self):
