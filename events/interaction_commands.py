@@ -4,6 +4,7 @@ from discord.ext import commands
 import config
 from utils.andreani import get_andreani_tracking
 from interactions.modals import FacturaAModal
+import re
 
 class InteractionCommands(commands.Cog):
     def __init__(self, bot):
@@ -56,48 +57,27 @@ class InteractionCommands(commands.Cog):
             except Exception as dm_error:
                 print(f"No se pudo enviar el JSON por DM: {dm_error}")
             
-            # Formatear la respuesta con más información
             if tracking_data:
                 info = tracking_data
-                tracking_info = f"📦 **Tracking: {tracking_number}**\n\n"
-                # Estado actual
-                if 'procesoActual' in info:
-                    proceso = info['procesoActual'].get('titulo', 'Sin datos')
-                    obs = info['procesoActual'].get('observaciones', '')
-                    tracking_info += f"**Estado Actual:** {proceso}\n"
-                    if obs:
-                        tracking_info += f"**Observaciones:** {obs}\n"
-                # Fecha estimada de entrega
-                if 'fechaEstimadaDeEntrega' in info:
-                    tracking_info += f"**Fecha estimada/entrega:** {info['fechaEstimadaDeEntrega']}\n"
-                # Remitente
-                if 'nombreRemitente' in info:
-                    tracking_info += f"**Remitente:** {info['nombreRemitente']}\n"
-                # Cliente
-                if 'cliente' in info and info['cliente']:
-                    cliente = info['cliente']
-                    nombre_cliente = cliente.get('nombre', '')
-                    cuit = cliente.get('cuit', '')
-                    if nombre_cliente:
-                        tracking_info += f"**Cliente:** {nombre_cliente}"
-                        if cuit:
-                            tracking_info += f" (CUIT: {cuit})"
-                        tracking_info += "\n"
-                # Preguntas frecuentes
-                if 'procesoActual' in info and info['procesoActual'].get('preguntasFrecuentes'):
-                    faq = info['procesoActual']['preguntasFrecuentes'][0]
-                    pregunta = faq.get('pregunta', '')
-                    respuesta = faq.get('respuesta', '')
-                    tracking_info += f"\n❓ **FAQ:** {pregunta}\n{respuesta}\n"
-                # Historial (si existiera)
-                if 'historial' in info and info['historial']:
-                    tracking_info += "\n**📋 Historial de Estados:**\n"
-                    for i, evento in enumerate(info['historial'][:5], 1):
-                        titulo = evento.get('titulo', 'Sin título')
-                        fecha = evento.get('fecha', 'Sin fecha')
-                        tracking_info += f"{i}. **{titulo}** - {fecha}\n"
+                # Estado actual y fecha
+                estado = info.get('procesoActual', {}).get('titulo', 'Sin datos')
+                fecha_entrega = clean_html(info.get('fechaEstimadaDeEntrega', ''))
+                tracking_info = f"📦 Estado del tracking {tracking_number}:\n{estado} - {fecha_entrega}\n\n"
+                # Historial
+                timelines = info.get('timelines', [])
+                if timelines:
+                    tracking_info += "Historial:\n"
+                    # Ordenar por fecha descendente
+                    eventos = []
+                    for tl in sorted(timelines, key=lambda x: x.get('orden', 0), reverse=True):
+                        for traduccion in tl.get('traducciones', []):
+                            fecha = traduccion.get('fechaEvento', '')[:10]
+                            desc = clean_html(traduccion.get('traduccion', ''))
+                            suc = traduccion.get('sucursal', {}).get('nombre', '')
+                            eventos.append(f"{fecha}: {desc} ({suc})")
+                    tracking_info += '\n'.join(eventos)
                 else:
-                    tracking_info += "\n**📋 Historial:** No disponible\n"
+                    tracking_info += "Historial: No disponible\n"
             else:
                 tracking_info = f"😕 No se pudo encontrar la información de tracking para **{tracking_number}**."
                 
@@ -246,6 +226,10 @@ class InteractionCommands(commands.Cog):
     async def ping(self, interaction: discord.Interaction):
         print("El bot está activo")
         await interaction.response.send_message("✅ El bot está activo.", ephemeral=True)
+
+def clean_html(raw_html):
+    cleanr = re.compile('<.*?>')
+    return re.sub(cleanr, '', raw_html).replace('&nbsp;', ' ').replace('&aacute;', 'á').replace('&eacute;', 'é').replace('&iacute;', 'í').replace('&oacute;', 'ó').replace('&uacute;', 'ú').replace('&ntilde;', 'ñ')
 
 async def setup(bot):
     await bot.add_cog(InteractionCommands(bot)) 
