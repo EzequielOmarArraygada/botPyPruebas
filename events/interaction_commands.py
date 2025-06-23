@@ -51,13 +51,6 @@ class InteractionCommands(commands.Cog):
         try:
             tracking_data = get_andreani_tracking(tracking_number, config.ANDREANI_AUTH_HEADER)
             
-            # Enviar el JSON por DM al usuario para debug
-            import json
-            try:
-                await interaction.user.send(f"DEBUG JSON:\n```json\n{json.dumps(tracking_data, indent=2)[:1900]}\n```")
-            except Exception as dm_error:
-                print(f"No se pudo enviar el JSON por DM: {dm_error}")
-            
             if tracking_data:
                 info = tracking_data
                 # Estado actual y fecha
@@ -72,10 +65,16 @@ class InteractionCommands(commands.Cog):
                     eventos = []
                     for tl in sorted(timelines, key=lambda x: x.get('orden', 0), reverse=True):
                         for traduccion in tl.get('traducciones', []):
-                            fecha = traduccion.get('fechaEvento', '')[:10]
+                            fecha_iso = traduccion.get('fechaEvento', '')
+                            # Formatear fecha a dd/mm/yyyy HH:MM
+                            try:
+                                dt = datetime.fromisoformat(fecha_iso)
+                                fecha_fmt = dt.strftime('%d/%m/%Y %H:%M')
+                            except Exception:
+                                fecha_fmt = fecha_iso
                             desc = clean_html(traduccion.get('traduccion', ''))
                             suc = traduccion.get('sucursal', {}).get('nombre', '')
-                            eventos.append(f"{fecha}: {desc} ({suc})")
+                            eventos.append(f"{fecha_fmt}: {desc} ({suc})")
                     tracking_info += '\n'.join(eventos)
                 else:
                     tracking_info += "Historial: No disponible\n"
