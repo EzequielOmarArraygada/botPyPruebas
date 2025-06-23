@@ -166,7 +166,7 @@ El caso ha sido guardado en Google Sheets y será monitoreado automáticamente."
             except Exception as error:
                 print('Error general durante el procesamiento del modal de caso:', error)
                 await interaction.response.send_message(f'❌ Hubo un error al procesar tu caso. Detalles: {error}', ephemeral=True)
-                delete_user_state(user_id)
+            delete_user_state(user_id)
 
         # --- Manejar sumisión de modals (FacturaAModal) ---
         elif (interaction.type == discord.InteractionType.modal_submit and 
