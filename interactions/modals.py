@@ -114,20 +114,32 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             print(f'DEBUG SHEET: Usando archivo con ID: {config.SPREADSHEET_ID_CASOS}')
-            sheet_name = getattr(config, 'SHEET_NAME_CASOS', None)
-            if sheet_name:
-                sheet = spreadsheet.worksheet(sheet_name)
-                print(f'DEBUG SHEET: Usando hoja: {sheet_name}')
+            # Usar rango y hoja configurados
+            sheet_range = getattr(config, 'SHEET_RANGE_CASOS_READ', 'A:K')
+            hoja_nombre = None
+            if '!' in sheet_range:
+                partes = sheet_range.split('!')
+                if len(partes) == 2:
+                    hoja_nombre = partes[0].strip("'")
+                    sheet_range_puro = partes[1]
+                else:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+            else:
+                sheet_range_puro = sheet_range
+            if hoja_nombre:
+                sheet = spreadsheet.worksheet(hoja_nombre)
+                print(f'DEBUG SHEET: Usando hoja: {hoja_nombre}')
             else:
                 sheet = spreadsheet.sheet1
                 print(f'DEBUG SHEET: Usando primera hoja: {sheet.title}')
-            # Leer encabezados
-            rows = sheet.get('A:Z')
+            print(f'DEBUG SHEET: Usando rango: {sheet_range_puro}')
+            rows = sheet.get(sheet_range_puro)
             if rows and len(rows) > 0:
                 print(f'DEBUG SHEET: Encabezados leídos: {rows[0]}')
             else:
                 print('DEBUG SHEET: No se leyeron filas en la hoja.')
-            is_duplicate = check_if_pedido_exists(sheet, 'A:Z', pedido)
+            is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             if is_duplicate:
                 await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Casos.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
