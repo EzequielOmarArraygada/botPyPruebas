@@ -7,6 +7,7 @@ import config
 import json
 from pathlib import Path
 from datetime import datetime
+import utils.google_sheets as google_sheets
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
@@ -94,8 +95,12 @@ class TaskRegisterButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        tareas_activas = cargar_tareas_activas()
-        if user_id in tareas_activas:
+        # --- Google Sheets ---
+        client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+        spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+        sheet_activas = spreadsheet.worksheet('Tareas Activas')
+        # Validar si ya tiene tarea activa
+        if google_sheets.usuario_tiene_tarea_activa(sheet_activas, user_id):
             await interaction.response.send_message(
                 '⚠️ Ya tienes una tarea activa. Finalízala antes de iniciar una nueva.',
                 ephemeral=True
@@ -148,38 +153,37 @@ class TaskStartButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        tareas_activas = cargar_tareas_activas()
-        if user_id in tareas_activas:
-            await interaction.response.send_message('⚠️ Ya tienes una tarea activa. Finalízala antes de iniciar una nueva.', ephemeral=True)
-            return
-        data = {
-            'usuario_id': user_id,
-            'usuario': str(interaction.user),
-            'tarea': self.tarea,
-            'observaciones': '',
-            'inicio': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        }
-        guardar_tarea_activa(user_id, data)
-        await interaction.response.send_message(f'¡Tarea "{self.tarea}" iniciada y registrada!', ephemeral=True)
+        # --- Google Sheets ---
+        client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+        spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+        sheet_activas = spreadsheet.worksheet('Tareas Activas')
+        sheet_historial = spreadsheet.worksheet('Historial')
+        usuario = str(interaction.user)
+        tarea = self.tarea
+        observaciones = ''
+        inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        # Registrar tarea activa
+        google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
+        # Agregar evento al historial
+        google_sheets.agregar_evento_historial(sheet_historial, user_id, usuario, tarea, observaciones, inicio, fin='', estado='Iniciada')
+        await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=True)
 
 class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
     observaciones = discord.ui.TextInput(label='Observaciones (opcional)', required=False, style=discord.TextStyle.paragraph)
 
     async def on_submit(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        tareas_activas = cargar_tareas_activas()
-        if user_id in tareas_activas:
-            await interaction.response.send_message('⚠️ Ya tienes una tarea activa. Finalízala antes de iniciar una nueva.', ephemeral=True)
-            return
+        # --- Google Sheets ---
+        client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+        spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+        sheet_activas = spreadsheet.worksheet('Tareas Activas')
+        sheet_historial = spreadsheet.worksheet('Historial')
+        usuario = str(interaction.user)
+        tarea = 'Otra'
         obs = self.observaciones.value.strip()
-        data = {
-            'usuario_id': user_id,
-            'usuario': str(interaction.user),
-            'tarea': 'Otra',
-            'observaciones': obs,
-            'inicio': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        }
-        guardar_tarea_activa(user_id, data)
+        inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
+        google_sheets.agregar_evento_historial(sheet_historial, user_id, usuario, tarea, obs, inicio, fin='', estado='Iniciada')
         await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
 
 async def setup(bot):
