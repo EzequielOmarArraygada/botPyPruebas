@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.ui import Button, View
 from interactions.modals import CasoModal
 from utils.state_manager import get_user_state, set_user_state, delete_user_state
 import config
@@ -24,7 +25,23 @@ class InteractionSelects(commands.Cog):
                     if 'values' in select_data and select_data['values']:
                         selected_tipo = select_data['values'][0]
                         print(f"Tipo seleccionado: {selected_tipo}")
-                        await interaction.response.send_message("Test respuesta select", ephemeral=True)
+                        # Guardar el tipo de solicitud y avanzar el paso
+                        set_user_state(user_id, {
+                            "type": "caso",
+                            "paso": 2,
+                            "tipoSolicitud": selected_tipo
+                        })
+                        # Crear el botón para completar detalles
+                        class CompleteCasoButton(Button):
+                            def __init__(self):
+                                super().__init__(label="Completar detalles del caso", style=discord.ButtonStyle.primary, custom_id="completeCasoDetailsButton")
+                        view = View()
+                        view.add_item(CompleteCasoButton())
+                        await interaction.response.send_message(
+                            content=f"Tipo de solicitud seleccionado: **{selected_tipo}**\n\nHaz clic en el botón para completar los detalles del caso.",
+                            view=view,
+                            ephemeral=True
+                        )
                         return
                     else:
                         raise ValueError("No se encontraron valores en la selección")
