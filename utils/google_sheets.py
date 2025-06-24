@@ -248,7 +248,8 @@ def get_col_index(header, col_name):
 
 def registrar_tarea_activa(sheet, user_id, usuario, tarea, observaciones, inicio, estado='En proceso'):
     """
-    Registra o actualiza una tarea activa para un usuario en la hoja 'Tareas Activas'.
+    Registra una nueva tarea activa para un usuario en la hoja 'Tareas Activas'.
+    Si el usuario ya tiene una tarea activa, lanza una excepción.
     """
     try:
         rows = sheet.get_all_values()
@@ -259,14 +260,18 @@ def registrar_tarea_activa(sheet, user_id, usuario, tarea, observaciones, inicio
         user_col = get_col_index(header, 'Usuario ID')
         if user_col is None:
             raise Exception('No se encontró la columna Usuario ID en la hoja de Tareas Activas.')
-        # Buscar si ya existe
+        
+        # Verificar si ya tiene una tarea activa
         for idx, row in enumerate(rows[1:], start=2):
             if len(row) > user_col and row[user_col] == user_id:
-                # Actualizar fila existente
-                nueva_fila = [user_id, usuario, tarea, observaciones, estado, inicio, '', '']
-                sheet.update(f'A{idx}:H{idx}', [nueva_fila])
-                return 'actualizado'
-        # Si no existe, agregar
+                # Verificar el estado de la tarea existente
+                estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
+                if estado_col is not None and len(row) > estado_col:
+                    estado_existente = row[estado_col].strip().lower()
+                    if estado_existente in ['en proceso', 'pausada']:
+                        raise Exception(f'El usuario ya tiene una tarea activa con estado "{estado_existente}". Debe finalizar la tarea actual antes de iniciar una nueva.')
+        
+        # Si no tiene tarea activa, agregar la nueva
         nueva_fila = [user_id, usuario, tarea, observaciones, estado, inicio, '', '']
         sheet.append_row(nueva_fila)
         return 'nuevo'

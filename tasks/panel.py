@@ -95,17 +95,6 @@ class TaskRegisterButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        # --- Google Sheets ---
-        client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
-        spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
-        sheet_activas = spreadsheet.worksheet('Tareas Activas')
-        # Validar si ya tiene tarea activa
-        if google_sheets.usuario_tiene_tarea_activa(sheet_activas, user_id):
-            await interaction.response.send_message(
-                '⚠️ Ya tienes una tarea activa. Finalízala antes de iniciar una nueva.',
-                ephemeral=True
-            )
-            return
         await interaction.response.send_message(
             'Selecciona la tarea que vas a realizar:',
             view=TaskSelectMenuView(),
@@ -162,21 +151,28 @@ class TaskStartButton(discord.ui.Button):
         tarea = self.tarea
         observaciones = ''
         inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        # Registrar tarea activa
-        google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
-        # Agregar evento al historial (corregido)
-        google_sheets.agregar_evento_historial(
-            sheet_historial,
-            user_id,
-            usuario,
-            tarea,
-            observaciones,
-            inicio,           # fecha_evento
-            'En proceso',     # estado
-            'Inicio',         # tipo_evento
-            ''                # tiempo_pausada
-        )
-        await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=True)
+        
+        try:
+            # Registrar tarea activa
+            google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
+            # Agregar evento al historial
+            google_sheets.agregar_evento_historial(
+                sheet_historial,
+                user_id,
+                usuario,
+                tarea,
+                observaciones,
+                inicio,           # fecha_evento
+                'En proceso',     # estado
+                'Inicio',         # tipo_evento
+                ''                # tiempo_pausada
+            )
+            await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=True)
+        except Exception as e:
+            if "ya tiene una tarea activa" in str(e):
+                await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
+            else:
+                await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
 
 class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
     observaciones = discord.ui.TextInput(label='Observaciones (opcional)', required=False, style=discord.TextStyle.paragraph)
@@ -192,19 +188,26 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
         tarea = 'Otra'
         obs = self.observaciones.value.strip()
         inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
-        google_sheets.agregar_evento_historial(
-            sheet_historial,
-            user_id,
-            usuario,
-            tarea,
-            obs,
-            inicio,           # fecha_evento
-            'En proceso',     # estado
-            'Inicio',         # tipo_evento
-            ''                # tiempo_pausada
-        )
-        await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
+        
+        try:
+            google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
+            google_sheets.agregar_evento_historial(
+                sheet_historial,
+                user_id,
+                usuario,
+                tarea,
+                obs,
+                inicio,           # fecha_evento
+                'En proceso',     # estado
+                'Inicio',         # tipo_evento
+                ''                # tiempo_pausada
+            )
+            await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
+        except Exception as e:
+            if "ya tiene una tarea activa" in str(e):
+                await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
+            else:
+                await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
 
 async def setup(bot):
     print('[DEBUG] Ejecutando setup() de TaskPanel')
