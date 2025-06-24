@@ -10,9 +10,11 @@ TARGET_CHANNEL_ID_TAREAS = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
 class TaskPanel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        print('[DEBUG] TaskPanel Cog inicializado')
 
     @app_commands.command(name='setup_panel_tareas', description='Publica el panel de tareas en el canal configurado (solo admins)')
     async def setup_panel_tareas(self, interaction: discord.Interaction):
+        print('[DEBUG] Ejecutando /setup_panel_tareas')
         # Solo admins pueden ejecutar
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message('No tienes permisos para usar este comando.', ephemeral=True)
@@ -33,6 +35,11 @@ class TaskPanel(commands.Cog):
         await canal.send(embed=embed, view=view)
         await interaction.response.send_message('Panel publicado correctamente.', ephemeral=True)
 
+    @app_commands.command(name='prueba', description='Comando de prueba')
+    async def prueba(self, interaction: discord.Interaction):
+        print('[DEBUG] Ejecutando /prueba')
+        await interaction.response.send_message('¡Funciona el comando de prueba!', ephemeral=True)
+
 class TaskPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -45,6 +52,7 @@ class TaskRegisterButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.send_message('Aquí irá el flujo de registro de tarea.', ephemeral=True)
 
-
 async def setup(bot):
-    await bot.add_cog(TaskPanel(bot)) 
+    print('[DEBUG] Ejecutando setup() de TaskPanel')
+    await bot.add_cog(TaskPanel(bot))
+    print('[DEBUG] TaskPanel Cog agregado al bot') 
