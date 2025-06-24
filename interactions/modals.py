@@ -113,11 +113,20 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
                 return
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
+            print(f'DEBUG SHEET: Usando archivo con ID: {config.SPREADSHEET_ID_CASOS}')
             sheet_name = getattr(config, 'SHEET_NAME_CASOS', None)
             if sheet_name:
                 sheet = spreadsheet.worksheet(sheet_name)
+                print(f'DEBUG SHEET: Usando hoja: {sheet_name}')
             else:
                 sheet = spreadsheet.sheet1
+                print(f'DEBUG SHEET: Usando primera hoja: {sheet.title}')
+            # Leer encabezados
+            rows = sheet.get('A:Z')
+            if rows and len(rows) > 0:
+                print(f'DEBUG SHEET: Encabezados leídos: {rows[0]}')
+            else:
+                print('DEBUG SHEET: No se leyeron filas en la hoja.')
             is_duplicate = check_if_pedido_exists(sheet, 'A:Z', pedido)
             if is_duplicate:
                 await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Casos.', ephemeral=True)
