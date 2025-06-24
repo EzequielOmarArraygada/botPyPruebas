@@ -1,6 +1,7 @@
 # Este módulo requiere 'discord.py' instalado en el entorno.
 import discord
 from discord.ext import commands
+from discord import app_commands
 import os
 
 # Obtener el ID del canal desde la variable de entorno
@@ -10,16 +11,18 @@ class TaskPanel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name='setup_panel_tareas')
-    @commands.has_permissions(administrator=True)
-    async def setup_panel_tareas(self, ctx):
-        """Comando para admins: publica el panel de tareas en el canal configurado."""
-        if TARGET_CHANNEL_ID_TAREAS == 0:
-            await ctx.send('La variable de entorno TARGET_CHANNEL_ID_TAREAS no está configurada.')
+    @app_commands.command(name='setup_panel_tareas', description='Publica el panel de tareas en el canal configurado (solo admins)')
+    async def setup_panel_tareas(self, interaction: discord.Interaction):
+        # Solo admins pueden ejecutar
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message('No tienes permisos para usar este comando.', ephemeral=True)
             return
-        canal = self.bot.get_channel(TARGET_CHANNEL_ID_TAREAS)
+        if TARGET_CHANNEL_ID_TAREAS == 0:
+            await interaction.response.send_message('La variable de entorno TARGET_CHANNEL_ID_TAREAS no está configurada.', ephemeral=True)
+            return
+        canal = interaction.guild.get_channel(TARGET_CHANNEL_ID_TAREAS)
         if not canal:
-            await ctx.send('No se encontró el canal configurado.')
+            await interaction.response.send_message('No se encontró el canal configurado.', ephemeral=True)
             return
         embed = discord.Embed(
             title='Panel de Registro de Tareas',
@@ -28,7 +31,11 @@ class TaskPanel(commands.Cog):
         )
         view = TaskPanelView()
         await canal.send(embed=embed, view=view)
-        await ctx.send('Panel publicado correctamente.')
+        await interaction.response.send_message('Panel publicado correctamente.', ephemeral=True)
+
+    async def cog_load(self):
+        # Registrar el comando en el árbol de comandos
+        self.bot.tree.add_command(self.setup_panel_tareas)
 
 class TaskPanelView(discord.ui.View):
     def __init__(self):
@@ -43,5 +50,5 @@ class TaskRegisterButton(discord.ui.Button):
         await interaction.response.send_message('Aquí irá el flujo de registro de tarea.', ephemeral=True)
 
 
-def setup(bot):
-    bot.add_cog(TaskPanel(bot)) 
+async def setup(bot):
+    await bot.add_cog(TaskPanel(bot)) 
