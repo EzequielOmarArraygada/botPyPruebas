@@ -167,7 +167,18 @@ class TaskStartButton(discord.ui.Button):
                 'Inicio',         # tipo_evento
                 ''                # tiempo_pausada
             )
+            
+            # Enviar confirmación al usuario
             await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=True)
+            
+            # Enviar embed al canal de registro
+            if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
+                canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
+                if canal_registro:
+                    embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso')
+                    view = TareaControlView(user_id)
+                    await canal_registro.send(embed=embed, view=view)
+            
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
                 await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
@@ -202,12 +213,165 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 'Inicio',         # tipo_evento
                 ''                # tiempo_pausada
             )
+            
+            # Enviar confirmación al usuario
             await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
+            
+            # Enviar embed al canal de registro
+            if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
+                canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
+                if canal_registro:
+                    embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso')
+                    view = TareaControlView(user_id)
+                    await canal_registro.send(embed=embed, view=view)
+            
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
                 await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
             else:
                 await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
+
+def crear_embed_tarea(user, tarea, observaciones, inicio, estado):
+    """
+    Crea un embed visualmente atractivo para mostrar los datos de una tarea.
+    """
+    embed = discord.Embed(
+        title=f'📋 Tarea Registrada: {tarea}',
+        description='Se ha registrado una nueva tarea en el sistema.',
+        color=discord.Color.green() if estado == 'En proceso' else discord.Color.orange(),
+        timestamp=datetime.now()
+    )
+    
+    embed.add_field(
+        name='👤 Asesor',
+        value=f'{user.mention}',
+        inline=True
+    )
+    
+    embed.add_field(
+        name='📝 Tipo de Tarea',
+        value=tarea,
+        inline=True
+    )
+    
+    embed.add_field(
+        name='⏰ Fecha de Inicio',
+        value=inicio,
+        inline=True
+    )
+    
+    if observaciones:
+        embed.add_field(
+            name='📋 Observaciones',
+            value=observaciones,
+            inline=False
+        )
+    
+    embed.add_field(
+        name='🔄 Estado',
+        value=estado,
+        inline=True
+    )
+    
+    embed.set_footer(text='Usa los botones de abajo para controlar la tarea')
+    
+    return embed
+
+class TareaControlView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+        self.add_item(PausarReanudarButton(user_id))
+        self.add_item(FinalizarButton(user_id))
+
+class PausarReanudarButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='⏸️ Pausar', style=discord.ButtonStyle.secondary, custom_id=f'pausar_{user_id}')
+        self.user_id = user_id
+
+    async def callback(self, interaction: discord.Interaction):
+        # Verificar que solo el usuario que creó la tarea puede modificarla
+        if str(interaction.user.id) != self.user_id:
+            await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
+            return
+        
+        try:
+            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            sheet_activas = spreadsheet.worksheet('Tareas Activas')
+            sheet_historial = spreadsheet.worksheet('Historial')
+            
+            # Obtener datos actuales de la tarea
+            datos_tarea = google_sheets.obtener_datos_tarea_activa(sheet_activas, self.user_id)
+            if not datos_tarea:
+                await interaction.response.send_message('❌ No se encontró la tarea activa.', ephemeral=True)
+                return
+            
+            fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+            
+            if datos_tarea['estado'].lower() == 'en proceso':
+                # Pausar la tarea
+                google_sheets.pausar_tarea_activa(sheet_activas, sheet_historial, self.user_id, str(interaction.user), fecha_actual)
+                
+                # Actualizar el botón
+                self.label = '▶️ Reanudar'
+                self.style = discord.ButtonStyle.success
+                self.custom_id = f'reanudar_{self.user_id}'
+                
+                # Actualizar el embed
+                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada')
+                embed.color = discord.Color.orange()
+                
+                await interaction.response.edit_message(embed=embed, view=self.view)
+                await interaction.followup.send('✅ Tarea pausada correctamente.', ephemeral=True)
+                
+            elif datos_tarea['estado'].lower() == 'pausada':
+                # Reanudar la tarea
+                google_sheets.reanudar_tarea_activa(sheet_activas, sheet_historial, self.user_id, str(interaction.user), fecha_actual)
+                
+                # Actualizar el botón
+                self.label = '⏸️ Pausar'
+                self.style = discord.ButtonStyle.secondary
+                self.custom_id = f'pausar_{self.user_id}'
+                
+                # Actualizar el embed
+                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso')
+                embed.color = discord.Color.green()
+                
+                await interaction.response.edit_message(embed=embed, view=self.view)
+                await interaction.followup.send('✅ Tarea reanudada correctamente.', ephemeral=True)
+                
+        except Exception as e:
+            await interaction.response.send_message(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
+
+class FinalizarButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='✅ Finalizar', style=discord.ButtonStyle.danger, custom_id=f'finalizar_{user_id}')
+        self.user_id = user_id
+
+    async def callback(self, interaction: discord.Interaction):
+        # Verificar que solo el usuario que creó la tarea puede modificarla
+        if str(interaction.user.id) != self.user_id:
+            await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
+            return
+        
+        try:
+            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            sheet_activas = spreadsheet.worksheet('Tareas Activas')
+            sheet_historial = spreadsheet.worksheet('Historial')
+            
+            fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+            
+            # Finalizar la tarea
+            google_sheets.finalizar_tarea_activa(sheet_activas, sheet_historial, self.user_id, str(interaction.user), fecha_actual)
+            
+            # Eliminar el mensaje
+            await interaction.message.delete()
+            await interaction.response.send_message('✅ Tarea finalizada correctamente.', ephemeral=True)
+            
+        except Exception as e:
+            await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
 
 async def setup(bot):
     print('[DEBUG] Ejecutando setup() de TaskPanel')

@@ -310,4 +310,188 @@ def agregar_evento_historial(sheet, user_id, usuario, tarea, observaciones, fech
         sheet.append_row(nueva_fila)
     except Exception as e:
         print(f'[ERROR] agregar_evento_historial: {e}')
-        raise 
+        raise
+
+def pausar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fecha_pausa):
+    """
+    Pausa una tarea activa y registra el evento en el historial.
+    """
+    try:
+        rows = sheet_activas.get_all_values()
+        if not rows or len(rows) < 2:
+            raise Exception('No se encontraron tareas activas.')
+        
+        header = rows[0]
+        user_col = get_col_index(header, 'Usuario ID')
+        estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
+        
+        if user_col is None or estado_col is None:
+            raise Exception('No se encontraron las columnas necesarias en la hoja de Tareas Activas.')
+        
+        # Buscar la tarea del usuario
+        for idx, row in enumerate(rows[1:], start=2):
+            if len(row) > user_col and row[user_col] == user_id:
+                estado_actual = row[estado_col].strip().lower() if len(row) > estado_col else ''
+                
+                if estado_actual == 'en proceso':
+                    # Actualizar estado a pausada
+                    sheet_activas.update_cell(idx, estado_col + 1, 'Pausada')
+                    
+                    # Obtener datos de la tarea para el historial
+                    tarea = row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else ''
+                    observaciones = row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else ''
+                    
+                    # Registrar evento en historial
+                    agregar_evento_historial(
+                        sheet_historial,
+                        user_id,
+                        usuario,
+                        tarea,
+                        observaciones,
+                        fecha_pausa,
+                        'Pausada',
+                        'Pausa',
+                        ''
+                    )
+                    return True
+                elif estado_actual == 'pausada':
+                    raise Exception('La tarea ya está pausada.')
+                else:
+                    raise Exception('La tarea no está en proceso.')
+        
+        raise Exception('No se encontró una tarea activa para este usuario.')
+    except Exception as e:
+        print(f'[ERROR] pausar_tarea_activa: {e}')
+        raise
+
+def reanudar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fecha_reanudacion):
+    """
+    Reanuda una tarea pausada y registra el evento en el historial.
+    """
+    try:
+        rows = sheet_activas.get_all_values()
+        if not rows or len(rows) < 2:
+            raise Exception('No se encontraron tareas activas.')
+        
+        header = rows[0]
+        user_col = get_col_index(header, 'Usuario ID')
+        estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
+        
+        if user_col is None or estado_col is None:
+            raise Exception('No se encontraron las columnas necesarias en la hoja de Tareas Activas.')
+        
+        # Buscar la tarea del usuario
+        for idx, row in enumerate(rows[1:], start=2):
+            if len(row) > user_col and row[user_col] == user_id:
+                estado_actual = row[estado_col].strip().lower() if len(row) > estado_col else ''
+                
+                if estado_actual == 'pausada':
+                    # Actualizar estado a en proceso
+                    sheet_activas.update_cell(idx, estado_col + 1, 'En proceso')
+                    
+                    # Obtener datos de la tarea para el historial
+                    tarea = row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else ''
+                    observaciones = row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else ''
+                    
+                    # Registrar evento en historial
+                    agregar_evento_historial(
+                        sheet_historial,
+                        user_id,
+                        usuario,
+                        tarea,
+                        observaciones,
+                        fecha_reanudacion,
+                        'En proceso',
+                        'Reanudación',
+                        ''
+                    )
+                    return True
+                elif estado_actual == 'en proceso':
+                    raise Exception('La tarea ya está en proceso.')
+                else:
+                    raise Exception('La tarea no está pausada.')
+        
+        raise Exception('No se encontró una tarea pausada para este usuario.')
+    except Exception as e:
+        print(f'[ERROR] reanudar_tarea_activa: {e}')
+        raise
+
+def finalizar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fecha_finalizacion):
+    """
+    Finaliza una tarea activa y registra el evento en el historial.
+    """
+    try:
+        rows = sheet_activas.get_all_values()
+        if not rows or len(rows) < 2:
+            raise Exception('No se encontraron tareas activas.')
+        
+        header = rows[0]
+        user_col = get_col_index(header, 'Usuario ID')
+        estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
+        
+        if user_col is None or estado_col is None:
+            raise Exception('No se encontraron las columnas necesarias en la hoja de Tareas Activas.')
+        
+        # Buscar la tarea del usuario
+        for idx, row in enumerate(rows[1:], start=2):
+            if len(row) > user_col and row[user_col] == user_id:
+                estado_actual = row[estado_col].strip().lower() if len(row) > estado_col else ''
+                
+                if estado_actual in ['en proceso', 'pausada']:
+                    # Obtener datos de la tarea para el historial antes de eliminar
+                    tarea = row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else ''
+                    observaciones = row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else ''
+                    
+                    # Eliminar la fila de tareas activas
+                    sheet_activas.delete_rows(idx)
+                    
+                    # Registrar evento en historial
+                    agregar_evento_historial(
+                        sheet_historial,
+                        user_id,
+                        usuario,
+                        tarea,
+                        observaciones,
+                        fecha_finalizacion,
+                        'Finalizada',
+                        'Finalización',
+                        ''
+                    )
+                    return True
+                else:
+                    raise Exception('La tarea no está activa.')
+        
+        raise Exception('No se encontró una tarea activa para este usuario.')
+    except Exception as e:
+        print(f'[ERROR] finalizar_tarea_activa: {e}')
+        raise
+
+def obtener_datos_tarea_activa(sheet, user_id):
+    """
+    Obtiene los datos de la tarea activa de un usuario.
+    """
+    try:
+        rows = sheet.get_all_values()
+        if not rows or len(rows) < 2:
+            return None
+        
+        header = rows[0]
+        user_col = get_col_index(header, 'Usuario ID')
+        
+        if user_col is None:
+            return None
+        
+        for row in rows[1:]:
+            if len(row) > user_col and row[user_col] == user_id:
+                return {
+                    'usuario': row[get_col_index(header, 'Usuario')] if len(row) > get_col_index(header, 'Usuario') else '',
+                    'tarea': row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else '',
+                    'observaciones': row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else '',
+                    'estado': row[get_col_index(header, 'Estado (En proceso, Pausada)')] if len(row) > get_col_index(header, 'Estado (En proceso, Pausada)') else '',
+                    'inicio': row[get_col_index(header, 'Fecha/hora de inicio')] if len(row) > get_col_index(header, 'Fecha/hora de inicio') else ''
+                }
+        
+        return None
+    except Exception as e:
+        print(f'[ERROR] obtener_datos_tarea_activa: {e}')
+        return None 
