@@ -6,6 +6,7 @@ import os
 import config
 import json
 from pathlib import Path
+from datetime import datetime
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
@@ -25,6 +26,12 @@ def cargar_tareas_activas():
             return json.load(f)
         except Exception:
             return {}
+
+def guardar_tarea_activa(user_id, data):
+    tareas = cargar_tareas_activas()
+    tareas[user_id] = data
+    with open(TAREAS_JSON_PATH, 'w', encoding='utf-8') as f:
+        json.dump(tareas, f, ensure_ascii=False, indent=2)
 
 def guilds_decorator():
     if guild_id:
@@ -130,14 +137,40 @@ class TaskStartButton(discord.ui.Button):
         self.tarea = tarea
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message(f'¡Listo! (Simulación) Tarea "{self.tarea}" iniciada.', ephemeral=True)
+        user_id = str(interaction.user.id)
+        tareas_activas = cargar_tareas_activas()
+        if user_id in tareas_activas:
+            await interaction.response.send_message('⚠️ Ya tienes una tarea activa. Finalízala antes de iniciar una nueva.', ephemeral=True)
+            return
+        data = {
+            'usuario_id': user_id,
+            'usuario': str(interaction.user),
+            'tarea': self.tarea,
+            'observaciones': '',
+            'inicio': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        }
+        guardar_tarea_activa(user_id, data)
+        await interaction.response.send_message(f'¡Tarea "{self.tarea}" iniciada y registrada!', ephemeral=True)
 
 class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
     observaciones = discord.ui.TextInput(label='Observaciones (opcional)', required=False, style=discord.TextStyle.paragraph)
 
     async def on_submit(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        tareas_activas = cargar_tareas_activas()
+        if user_id in tareas_activas:
+            await interaction.response.send_message('⚠️ Ya tienes una tarea activa. Finalízala antes de iniciar una nueva.', ephemeral=True)
+            return
         obs = self.observaciones.value.strip()
-        await interaction.response.send_message(f'¡Listo! (Simulación) Tarea "Otra" iniciada. Observaciones: {obs}', ephemeral=True)
+        data = {
+            'usuario_id': user_id,
+            'usuario': str(interaction.user),
+            'tarea': 'Otra',
+            'observaciones': obs,
+            'inicio': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        }
+        guardar_tarea_activa(user_id, data)
+        await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
 
 async def setup(bot):
     print('[DEBUG] Ejecutando setup() de TaskPanel')
