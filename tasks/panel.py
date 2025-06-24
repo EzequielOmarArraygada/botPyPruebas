@@ -164,8 +164,18 @@ class TaskStartButton(discord.ui.Button):
         inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
         # Registrar tarea activa
         google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
-        # Agregar evento al historial
-        google_sheets.agregar_evento_historial(sheet_historial, user_id, usuario, tarea, observaciones, inicio, fin='', estado='Iniciada')
+        # Agregar evento al historial (corregido)
+        google_sheets.agregar_evento_historial(
+            sheet_historial,
+            user_id,
+            usuario,
+            tarea,
+            observaciones,
+            inicio,           # fecha_evento
+            'En proceso',     # estado
+            'Inicio',         # tipo_evento
+            ''                # tiempo_pausada
+        )
         await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=True)
 
 class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
@@ -183,7 +193,17 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
         obs = self.observaciones.value.strip()
         inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
         google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
-        google_sheets.agregar_evento_historial(sheet_historial, user_id, usuario, tarea, obs, inicio, fin='', estado='Iniciada')
+        google_sheets.agregar_evento_historial(
+            sheet_historial,
+            user_id,
+            usuario,
+            tarea,
+            obs,
+            inicio,           # fecha_evento
+            'En proceso',     # estado
+            'Inicio',         # tipo_evento
+            ''                # tiempo_pausada
+        )
         await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
 
 async def setup(bot):
