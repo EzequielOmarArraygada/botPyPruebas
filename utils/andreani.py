@@ -44,9 +44,6 @@ def get_andreani_tracking(tracking_number: str, auth_header: str) -> dict:
         tracking_data = response.json()
         print("Respuesta de la API JSON recibida y parseada.")
         
-        # Agregar información adicional para debugging
-        print(f"Datos completos del tracking: {tracking_data}")
-        
         return tracking_data
     except Exception as error:
         print('Error en get_andreani_tracking:', error)
