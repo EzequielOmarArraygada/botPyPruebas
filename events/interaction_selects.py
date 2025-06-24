@@ -35,6 +35,8 @@ class InteractionSelects(commands.Cog):
                         class CompleteCasoButton(Button):
                             def __init__(self):
                                 super().__init__(label="Completar detalles del caso", style=discord.ButtonStyle.primary, custom_id="completeCasoDetailsButton")
+                            async def callback(self, interaction):
+                                pass  # El manejo real está en el listener
                         view = View()
                         view.add_item(CompleteCasoButton())
                         await interaction.response.send_message(
