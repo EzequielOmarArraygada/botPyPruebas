@@ -104,9 +104,14 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         except Exception:
             members = guild.members  # fallback si ya están en caché
         
+        header_row = rows[0]
+        # Buscar los índices de las columnas por título
+        error_column_index = next((i for i, h in enumerate(header_row) if h and str(h).strip().lower() == 'error'), None)
+        notified_column_index = next((i for i, h in enumerate(header_row) if h and str(h).strip().lower() == 'errorenviocheck'), None)
+        if error_column_index is None or notified_column_index is None:
+            print('No se encontraron las columnas "ERROR" o "ErrorEnvioCheck" en la hoja.')
+            return
         for i, row in enumerate(rows[1:], start=2):
-            error_column_index = 9  # Columna J
-            notified_column_index = 10  # Columna K
             error_value = str(row[error_column_index]).strip() if len(row) > error_column_index and row[error_column_index] else ''
             notified_value = str(row[notified_column_index]).strip() if len(row) > notified_column_index and row[notified_column_index] else ''
             if error_value and not notified_value:
@@ -137,7 +142,15 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                     tz = pytz.timezone('America/Argentina/Buenos_Aires')
                     now = datetime.now(tz)
                     notification_timestamp = now.strftime('%d-%m-%Y %H:%M:%S')
-                    update_cell = f'K{i}'
+                    # Buscar la letra de la columna para update_cell
+                    def colnum_string(n):
+                        string = ''
+                        while n >= 0:
+                            string = chr(n % 26 + ord('A')) + string
+                            n = n // 26 - 1
+                        return string
+                    notified_col_letter = colnum_string(notified_column_index)
+                    update_cell = f'{notified_col_letter}{i}'
                     sheet.update(update_cell, f'Notificado {notification_timestamp}')
                     print(f'Fila {i} marcada como notificada en Google Sheets.')
                 except Exception as send_or_update_error:
