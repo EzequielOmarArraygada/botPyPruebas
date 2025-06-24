@@ -10,6 +10,7 @@ from datetime import datetime
 import utils.google_sheets as google_sheets
 import asyncio
 import pytz
+import re
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
@@ -325,25 +326,28 @@ def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado
     return embed
 
 class TareaControlView(discord.ui.View):
-    def __init__(self, user_id, tarea_id=None):
+    def __init__(self, user_id=None, tarea_id=None):
         super().__init__(timeout=None)
         self.user_id = user_id
         self.tarea_id = tarea_id
-        if tarea_id:
-            self.add_item(PausarReanudarButton(user_id, tarea_id))
-            self.add_item(FinalizarButton(user_id, tarea_id))
-        else:
-            self.add_item(PausarReanudarButton(user_id))
-            self.add_item(FinalizarButton(user_id))
+        self.add_item(PausarReanudarButton(user_id, tarea_id))
+        self.add_item(FinalizarButton(user_id, tarea_id))
 
 class PausarReanudarButton(discord.ui.Button):
-    def __init__(self, user_id, tarea_id):
-        super().__init__(label='⏸️ Pausar', style=discord.ButtonStyle.secondary, custom_id=f'pausar_{user_id}_{tarea_id}')
+    def __init__(self, user_id=None, tarea_id=None):
+        # Si no se pasan, se extraen del custom_id en el callback
+        custom_id = f'pausar_{user_id}_{tarea_id}' if user_id and tarea_id else None
+        super().__init__(label='⏸️ Pausar', style=discord.ButtonStyle.secondary, custom_id=custom_id)
         self.user_id = user_id
         self.tarea_id = tarea_id
 
     async def callback(self, interaction: discord.Interaction):
-        # Verificar que solo el usuario que creó la tarea puede modificarla
+        # Extraer user_id y tarea_id del custom_id si no están en self
+        if not self.user_id or not self.tarea_id:
+            match = re.match(r'pausar_(\d+)_(.+)', self.custom_id)
+            if match:
+                self.user_id = match.group(1)
+                self.tarea_id = match.group(2)
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
@@ -410,13 +414,18 @@ class PausarReanudarButton(discord.ui.Button):
             await interaction.response.send_message(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
 
 class FinalizarButton(discord.ui.Button):
-    def __init__(self, user_id, tarea_id=None):
-        super().__init__(label='✅ Finalizar', style=discord.ButtonStyle.danger, custom_id=f'finalizar_{user_id}_{tarea_id}')
+    def __init__(self, user_id=None, tarea_id=None):
+        custom_id = f'finalizar_{user_id}_{tarea_id}' if user_id and tarea_id else None
+        super().__init__(label='✅ Finalizar', style=discord.ButtonStyle.danger, custom_id=custom_id)
         self.user_id = user_id
         self.tarea_id = tarea_id
 
     async def callback(self, interaction: discord.Interaction):
-        # Verificar que solo el usuario que creó la tarea puede modificarla
+        if not self.user_id or not self.tarea_id:
+            match = re.match(r'finalizar_(\d+)_(.+)', self.custom_id)
+            if match:
+                self.user_id = match.group(1)
+                self.tarea_id = match.group(2)
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
@@ -458,7 +467,10 @@ class FinalizarButton(discord.ui.Button):
         except Exception as e:
             await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
 
+# --- REGISTRO DE VIEWS PERSISTENTES EN EL ARRANQUE DEL BOT ---
 async def setup(bot):
     print('[DEBUG] Ejecutando setup() de TaskPanel')
+    # Registrar las views persistentes para los botones de tareas
+    bot.add_view(TareaControlView())
     await bot.add_cog(TaskPanel(bot))
     print('[DEBUG] TaskPanel Cog agregado al bot') 
