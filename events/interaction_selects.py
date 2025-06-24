@@ -5,6 +5,18 @@ from interactions.modals import CasoModal
 from utils.state_manager import get_user_state, set_user_state, delete_user_state
 import config
 
+# --- NUEVO: Definición de la View y el Button fuera de la función ---
+class CompleteCasoButton(Button):
+    def __init__(self):
+        super().__init__(label="Completar detalles del caso", style=discord.ButtonStyle.primary, custom_id="completeCasoDetailsButton")
+    async def callback(self, interaction):
+        pass  # El flujo real lo maneja el listener
+
+class CompleteCasoView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(CompleteCasoButton())
+
 class InteractionSelects(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -31,14 +43,8 @@ class InteractionSelects(commands.Cog):
                             "paso": 2,
                             "tipoSolicitud": selected_tipo
                         })
-                        # Crear el botón para completar detalles
-                        class CompleteCasoButton(Button):
-                            def __init__(self):
-                                super().__init__(label="Completar detalles del caso", style=discord.ButtonStyle.primary, custom_id="completeCasoDetailsButton")
-                            async def callback(self, interaction):
-                                pass  # El manejo real está en el listener
-                        view = View()
-                        view.add_item(CompleteCasoButton())
+                        # Usar la View bien definida
+                        view = CompleteCasoView()
                         await interaction.response.send_message(
                             content=f"Tipo de solicitud seleccionado: **{selected_tipo}**\n\nHaz clic en el botón para completar los detalles del caso.",
                             view=view,
