@@ -14,24 +14,34 @@ guild_id = int(getattr(config, 'GUILD_ID', 0))
 print(f'[DEBUG] GUILD_ID usado para comandos slash: {guild_id}')
 
 TAREAS_JSON_PATH = Path('data/tareas_activas.json')
+print(f'[DEBUG] Ruta absoluta del JSON de tareas activas: {TAREAS_JSON_PATH.resolve()}')
 TAREAS_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 def cargar_tareas_activas():
     if not TAREAS_JSON_PATH.exists():
-        with open(TAREAS_JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump({}, f)
+        print('[DEBUG] El archivo JSON no existe, creando vacío.')
+        try:
+            with open(TAREAS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump({}, f)
+        except Exception as e:
+            print(f'[ERROR] No se pudo crear el JSON: {e}')
         return {}
     with open(TAREAS_JSON_PATH, 'r', encoding='utf-8') as f:
         try:
             return json.load(f)
-        except Exception:
+        except Exception as e:
+            print(f'[ERROR] No se pudo leer el JSON: {e}')
             return {}
 
 def guardar_tarea_activa(user_id, data):
     tareas = cargar_tareas_activas()
     tareas[user_id] = data
-    with open(TAREAS_JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump(tareas, f, ensure_ascii=False, indent=2)
+    try:
+        with open(TAREAS_JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump(tareas, f, ensure_ascii=False, indent=2)
+        print(f'[DEBUG] Tarea guardada para usuario {user_id}')
+    except Exception as e:
+        print(f'[ERROR] No se pudo guardar el JSON: {e}')
 
 def guilds_decorator():
     if guild_id:
