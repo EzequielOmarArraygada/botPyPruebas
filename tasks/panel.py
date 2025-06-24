@@ -154,11 +154,12 @@ class TaskStartButton(discord.ui.Button):
         
         try:
             # Registrar tarea activa
-            google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
+            tarea_id = google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
             # Agregar evento al historial
             google_sheets.agregar_evento_historial(
                 sheet_historial,
                 user_id,
+                tarea_id,
                 usuario,
                 tarea,
                 observaciones,
@@ -176,7 +177,7 @@ class TaskStartButton(discord.ui.Button):
                 canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
                 if canal_registro:
                     embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso', '00:00:00')
-                    view = TareaControlView(user_id)
+                    view = TareaControlView(user_id, tarea_id)
                     await canal_registro.send(embed=embed, view=view)
             
         except Exception as e:
@@ -201,10 +202,11 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
         inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
         
         try:
-            google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
+            tarea_id = google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
             google_sheets.agregar_evento_historial(
                 sheet_historial,
                 user_id,
+                tarea_id,
                 usuario,
                 tarea,
                 obs,
@@ -222,7 +224,7 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
                 if canal_registro:
                     embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso', '00:00:00')
-                    view = TareaControlView(user_id)
+                    view = TareaControlView(user_id, tarea_id)
                     await canal_registro.send(embed=embed, view=view)
             
         except Exception as e:
@@ -298,16 +300,22 @@ def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado
     return embed
 
 class TareaControlView(discord.ui.View):
-    def __init__(self, user_id):
+    def __init__(self, user_id, tarea_id=None):
         super().__init__(timeout=None)
         self.user_id = user_id
-        self.add_item(PausarReanudarButton(user_id))
-        self.add_item(FinalizarButton(user_id))
+        self.tarea_id = tarea_id
+        if tarea_id:
+            self.add_item(PausarReanudarButton(user_id, tarea_id))
+            self.add_item(FinalizarButton(user_id, tarea_id))
+        else:
+            self.add_item(PausarReanudarButton(user_id))
+            self.add_item(FinalizarButton(user_id))
 
 class PausarReanudarButton(discord.ui.Button):
-    def __init__(self, user_id):
-        super().__init__(label='⏸️ Pausar', style=discord.ButtonStyle.secondary, custom_id=f'pausar_{user_id}')
+    def __init__(self, user_id, tarea_id):
+        super().__init__(label='⏸️ Pausar', style=discord.ButtonStyle.secondary, custom_id=f'pausar_{user_id}_{tarea_id}')
         self.user_id = user_id
+        self.tarea_id = tarea_id
 
     async def callback(self, interaction: discord.Interaction):
         # Verificar que solo el usuario que creó la tarea puede modificarla
@@ -321,22 +329,22 @@ class PausarReanudarButton(discord.ui.Button):
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
             
-            # Obtener datos actuales de la tarea
-            datos_tarea = google_sheets.obtener_datos_tarea_activa(sheet_activas, self.user_id)
+            # Obtener datos actuales de la tarea por ID
+            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
-                await interaction.response.send_message('❌ No se encontró la tarea activa.', ephemeral=True)
+                await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
             
             fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
             
             if datos_tarea['estado'].lower() == 'en proceso':
                 # Pausar la tarea
-                google_sheets.pausar_tarea_activa(sheet_activas, sheet_historial, self.user_id, str(interaction.user), fecha_actual)
+                google_sheets.pausar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
                 
                 # Actualizar el botón
                 self.label = '▶️ Reanudar'
                 self.style = discord.ButtonStyle.success
-                self.custom_id = f'reanudar_{self.user_id}'
+                self.custom_id = f'reanudar_{self.user_id}_{self.tarea_id}'
                 
                 # Actualizar el embed
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada', datos_tarea['tiempo_pausado'])
@@ -347,12 +355,12 @@ class PausarReanudarButton(discord.ui.Button):
                 
             elif datos_tarea['estado'].lower() == 'pausada':
                 # Reanudar la tarea
-                google_sheets.reanudar_tarea_activa(sheet_activas, sheet_historial, self.user_id, str(interaction.user), fecha_actual)
+                google_sheets.reanudar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
                 
                 # Actualizar el botón
                 self.label = '⏸️ Pausar'
                 self.style = discord.ButtonStyle.secondary
-                self.custom_id = f'pausar_{self.user_id}'
+                self.custom_id = f'pausar_{self.user_id}_{self.tarea_id}'
                 
                 # Actualizar el embed
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso', datos_tarea['tiempo_pausado'])
@@ -365,9 +373,10 @@ class PausarReanudarButton(discord.ui.Button):
             await interaction.response.send_message(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
 
 class FinalizarButton(discord.ui.Button):
-    def __init__(self, user_id):
-        super().__init__(label='✅ Finalizar', style=discord.ButtonStyle.danger, custom_id=f'finalizar_{user_id}')
+    def __init__(self, user_id, tarea_id=None):
+        super().__init__(label='✅ Finalizar', style=discord.ButtonStyle.danger, custom_id=f'finalizar_{user_id}_{tarea_id}')
         self.user_id = user_id
+        self.tarea_id = tarea_id
 
     async def callback(self, interaction: discord.Interaction):
         # Verificar que solo el usuario que creó la tarea puede modificarla
@@ -381,16 +390,16 @@ class FinalizarButton(discord.ui.Button):
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
             
-            # Obtener datos actuales de la tarea
-            datos_tarea = google_sheets.obtener_datos_tarea_activa(sheet_activas, self.user_id)
+            # Obtener datos actuales de la tarea por ID
+            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
-                await interaction.response.send_message('❌ No se encontró la tarea activa.', ephemeral=True)
+                await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
             
             fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
             
             # Finalizar la tarea
-            google_sheets.finalizar_tarea_activa(sheet_activas, sheet_historial, self.user_id, str(interaction.user), fecha_actual)
+            google_sheets.finalizar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
             
             # Actualizar el embed con estado finalizado
             embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Finalizada', datos_tarea['tiempo_pausado'])
