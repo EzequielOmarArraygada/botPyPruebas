@@ -60,7 +60,60 @@ class TaskRegisterButton(discord.ui.Button):
         super().__init__(label='Registrar nueva tarea', style=discord.ButtonStyle.primary)
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message('Aquí irá el flujo de registro de tarea.', ephemeral=True)
+        await interaction.response.send_message(
+            'Selecciona la tarea que vas a realizar:',
+            view=TaskSelectMenuView(),
+            ephemeral=True
+        )
+
+class TaskSelectMenu(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label='Facturas B', value='Facturas B'),
+            discord.SelectOption(label='Facturas A', value='Facturas A'),
+            discord.SelectOption(label='Reclamos ML', value='Reclamos ML'),
+            discord.SelectOption(label='Cambios / Devoluciones', value='Cambios / Devoluciones'),
+            discord.SelectOption(label='Cancelaciones', value='Cancelaciones'),
+            discord.SelectOption(label='Reembolsos', value='Reembolsos'),
+            discord.SelectOption(label='Otra', value='Otra'),
+        ]
+        super().__init__(placeholder='Selecciona una tarea...', min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        seleccion = self.values[0]
+        if seleccion == 'Otra':
+            await interaction.response.send_modal(TaskObservacionesModal())
+        else:
+            await interaction.response.send_message(
+                f'Tarea seleccionada: **{seleccion}**\nPresiona "Comenzar" para iniciar.',
+                view=TaskStartButtonView(seleccion),
+                ephemeral=True
+            )
+
+class TaskSelectMenuView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=120)
+        self.add_item(TaskSelectMenu())
+
+class TaskStartButtonView(discord.ui.View):
+    def __init__(self, tarea):
+        super().__init__(timeout=60)
+        self.add_item(TaskStartButton(tarea))
+
+class TaskStartButton(discord.ui.Button):
+    def __init__(self, tarea):
+        super().__init__(label='Comenzar', style=discord.ButtonStyle.success)
+        self.tarea = tarea
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message(f'¡Listo! (Simulación) Tarea "{self.tarea}" iniciada.', ephemeral=True)
+
+class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
+    observaciones = discord.ui.TextInput(label='Observaciones (opcional)', required=False, style=discord.TextStyle.paragraph)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        obs = self.observaciones.value.strip()
+        await interaction.response.send_message(f'¡Listo! (Simulación) Tarea "Otra" iniciada. Observaciones: {obs}', ephemeral=True)
 
 async def setup(bot):
     print('[DEBUG] Ejecutando setup() de TaskPanel')
