@@ -197,16 +197,22 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                     tz = pytz.timezone('America/Argentina/Buenos_Aires')
                     now = datetime.now(tz)
                     notification_timestamp = now.strftime('%d-%m-%Y %H:%M:%S')
-                    # Buscar la letra de la columna para update_cell
+                    
+                    # Convertir índice de columna a letra (corregido)
                     def colnum_string(n):
-                        string = ''
+                        result = ""
                         while n >= 0:
-                            string = chr(n % 26 + ord('A')) + string
-                            n = n // 26 - 1
-                        return string
+                            n, remainder = divmod(n, 26)
+                            result = chr(65 + remainder) + result
+                            n -= 1
+                        return result
+                    
                     notified_col_letter = colnum_string(notified_column_index)
                     update_cell = f'{notified_col_letter}{i}'
-                    sheet.update(update_cell, f'Notificado {notification_timestamp}')
+                    print(f'Intentando marcar celda {update_cell} como notificada...')
+                    
+                    # Usar update_cell en lugar de update para una sola celda
+                    sheet.update_cell(i, notified_column_index + 1, f'Notificado {notification_timestamp}')
                     print(f'Fila {i} marcada como notificada en Google Sheets.')
                 except Exception as send_or_update_error:
                     print(f'Error al enviar el mensaje de notificación o marcar la fila {i}:', send_or_update_error)
