@@ -371,7 +371,12 @@ class PausarReanudarButton(discord.ui.Button):
                 embed.color = discord.Color.orange()
                 
                 await interaction.response.edit_message(embed=embed, view=self.view)
-                await interaction.followup.send('✅ Tarea pausada correctamente.', ephemeral=True)
+                msg = await interaction.followup.send('✅ Tarea pausada correctamente.')
+                await asyncio.sleep(20)
+                try:
+                    await msg.delete()
+                except:
+                    pass
                 
             elif datos_tarea['estado'].lower() == 'pausada':
                 # Reanudar la tarea
@@ -387,7 +392,12 @@ class PausarReanudarButton(discord.ui.Button):
                 embed.color = discord.Color.green()
                 
                 await interaction.response.edit_message(embed=embed, view=self.view)
-                await interaction.followup.send('✅ Tarea reanudada correctamente.', ephemeral=True)
+                msg = await interaction.followup.send('✅ Tarea reanudada correctamente.')
+                await asyncio.sleep(20)
+                try:
+                    await msg.delete()
+                except:
+                    pass
                 
         except Exception as e:
             await interaction.response.send_message(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
@@ -429,7 +439,12 @@ class FinalizarButton(discord.ui.Button):
             view = discord.ui.View(timeout=None)
             
             await interaction.response.edit_message(embed=embed, view=view)
-            await interaction.followup.send('✅ Tarea finalizada correctamente.', ephemeral=True)
+            msg = await interaction.followup.send('✅ Tarea finalizada correctamente.')
+            await asyncio.sleep(20)
+            try:
+                await msg.delete()
+            except:
+                pass
             
         except Exception as e:
             await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
