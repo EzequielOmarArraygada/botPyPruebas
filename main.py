@@ -110,7 +110,8 @@ async def load_extensions():
         'events.interaction_selects',
         'events.attachment_handler',
         'interactions.modals',
-        'interactions.select_menus'
+        'interactions.select_menus',
+        'tasks.panel'
     ]
     
     for extension in extensions:
