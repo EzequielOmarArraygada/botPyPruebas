@@ -59,7 +59,6 @@ class TaskPanel(commands.Cog):
         print('[DEBUG] TaskPanel Cog inicializado')
 
     @app_commands.command(name='setup_panel_tareas', description='Publica el panel de tareas en el canal configurado (solo admins)')
-    @app_commands.default_permissions(administrator=True)
     async def setup_panel_tareas(self, interaction: discord.Interaction):
         print('[DEBUG] Ejecutando /setup_panel_tareas')
         # Solo admins pueden ejecutar
