@@ -13,9 +13,10 @@ import pytz
 import re
 
 # Obtener el ID del canal desde la variable de entorno
-target_channel_id = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
+target_channel_id = int(getattr(config, 'TARGET_CHANNEL_ID_TAREAS', '0') or '0')
 guild_id = int(getattr(config, 'GUILD_ID', 0))
 print(f'[DEBUG] GUILD_ID usado para comandos slash: {guild_id}')
+print(f'[DEBUG] TARGET_CHANNEL_ID_TAREAS: {target_channel_id}')
 
 TAREAS_JSON_PATH = Path('data/tareas_activas.json')
 print(f'[DEBUG] Ruta absoluta del JSON de tareas activas: {TAREAS_JSON_PATH.resolve()}')
@@ -58,6 +59,7 @@ class TaskPanel(commands.Cog):
         print('[DEBUG] TaskPanel Cog inicializado')
 
     @app_commands.command(name='setup_panel_tareas', description='Publica el panel de tareas en el canal configurado (solo admins)')
+    @app_commands.default_permissions(administrator=True)
     async def setup_panel_tareas(self, interaction: discord.Interaction):
         print('[DEBUG] Ejecutando /setup_panel_tareas')
         # Solo admins pueden ejecutar
