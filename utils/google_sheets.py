@@ -67,30 +67,44 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
     Verifica errores en la hoja de Google Sheets y notifica en Discord.
     :param bot: Instancia de discord.ext.commands.Bot
     :param sheet: Instancia de gspread.Worksheet
-    :param sheet_range: Rango de lectura (ej: 'A:K')
+    :param sheet_range: Rango de lectura (ej: 'A:K' o 'SheetName!A:K')
     :param target_channel_id: ID del canal de Discord para notificaciones
     :param guild_id: ID del servidor de Discord
     """
     print('Iniciando verificación de errores en Google Sheets...')
-    print(f'Hoja: {sheet.title}')
+    print(f'Hoja actual: {sheet.title}')
     print(f'Rango solicitado: {sheet_range}')
     
     try:
-        # Limpiar el rango si tiene formato incorrecto
+        # Verificar si el rango incluye un nombre de hoja específica
+        hoja_nombre = None
+        sheet_range_puro = sheet_range
+        
         if '!' in sheet_range:
-            # Si el rango tiene formato 'SheetName!Range', extraer solo el rango
+            # Si el rango tiene formato 'SheetName!Range', extraer nombre de hoja y rango
             parts = sheet_range.split('!')
-            if len(parts) >= 2:
-                sheet_range = parts[-1]  # Tomar la última parte como rango
-                print(f"Rango limpiado de '{sheet_range}' a '{sheet_range}'")
+            if len(parts) == 2:
+                hoja_nombre = parts[0].strip("'")  # Remover comillas si las hay
+                sheet_range_puro = parts[1]
+                print(f"Nombre de hoja extraído: '{hoja_nombre}'")
+                print(f"Rango puro: '{sheet_range_puro}'")
+                
+                # Obtener la hoja específica
+                try:
+                    spreadsheet = sheet.spreadsheet
+                    sheet = spreadsheet.worksheet(hoja_nombre)
+                    print(f"Cambiado a hoja: {sheet.title}")
+                except Exception as e:
+                    print(f"Error al cambiar a la hoja '{hoja_nombre}': {e}")
+                    return
         
         # Validar formato del rango
-        if not sheet_range or ':' not in sheet_range:
-            print(f"Error: Rango inválido '{sheet_range}'. Debe tener formato 'A:K'")
+        if not sheet_range_puro or ':' not in sheet_range_puro:
+            print(f"Error: Rango inválido '{sheet_range_puro}'. Debe tener formato 'A:K'")
             return
         
-        print(f'Intentando leer rango: {sheet_range}')
-        rows = sheet.get(sheet_range)
+        print(f'Intentando leer rango: {sheet_range_puro}')
+        rows = sheet.get(sheet_range_puro)
         print(f'Filas leídas: {len(rows) if rows else 0}')
         
         if not rows:
