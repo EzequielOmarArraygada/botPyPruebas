@@ -54,12 +54,12 @@ async def on_ready():
     else:
         print("La verificación periódica de errores en la hoja de búsqueda no se iniciará debido a la falta de configuración.")
 
+    # --- Sincronizar comandos de aplicación (slash) ---
     try:
-        guild = discord.Object(id=config.GUILD_ID)
-        synced = await bot.tree.sync(guild=guild)
-        print(f'Slash commands sincronizados en guild: {config.GUILD_ID} ({len(synced)})')
+        synced = await bot.tree.sync()
+        print(f"Comandos sincronizados: {len(synced)}")
     except Exception as e:
-        print(f'Error al sincronizar slash commands: {e}')
+        print(f"Error al sincronizar comandos: {e}")
 
 @tasks.loop(seconds=config.ERROR_CHECK_INTERVAL_MS / 1000)
 async def check_errors():
