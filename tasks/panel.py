@@ -58,6 +58,7 @@ class TaskPanel(commands.Cog):
         self.bot = bot
         print('[DEBUG] TaskPanel Cog inicializado')
 
+    @app_commands.guilds(discord.Object(id=int(config.GUILD_ID)))
     @app_commands.command(name='setup_panel_tareas', description='Publica el panel de tareas en el canal configurado (solo admins)')
     async def setup_panel_tareas(self, interaction: discord.Interaction):
         print('[DEBUG] Ejecutando /setup_panel_tareas')
@@ -81,6 +82,7 @@ class TaskPanel(commands.Cog):
         await canal.send(embed=embed, view=view)
         await interaction.response.send_message('Panel publicado correctamente.', ephemeral=True)
 
+    @app_commands.guilds(discord.Object(id=int(config.GUILD_ID)))
     @app_commands.command(name='prueba', description='Comando de prueba')
     async def prueba(self, interaction: discord.Interaction):
         print('[DEBUG] Ejecutando /prueba')
