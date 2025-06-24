@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime
 import utils.google_sheets as google_sheets
 import asyncio
+import pytz
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
@@ -157,7 +158,9 @@ class TaskStartButton(discord.ui.Button):
         usuario = str(interaction.user)
         tarea = self.tarea
         observaciones = ''
-        inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        tz = pytz.timezone('America/Argentina/Buenos_Aires')
+        now = datetime.now(tz)
+        inicio = now.strftime('%d/%m/%Y %H:%M:%S')
         
         try:
             # Registrar tarea activa
@@ -212,7 +215,9 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
         usuario = str(interaction.user)
         tarea = 'Otra'
         obs = self.observaciones.value.strip()
-        inicio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        tz = pytz.timezone('America/Argentina/Buenos_Aires')
+        now = datetime.now(tz)
+        inicio = now.strftime('%d/%m/%Y %H:%M:%S')
         
         try:
             tarea_id = google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
@@ -355,7 +360,9 @@ class PausarReanudarButton(discord.ui.Button):
                 await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
             
-            fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
             
             if datos_tarea['estado'].lower() == 'en proceso':
                 # Pausar la tarea
@@ -426,7 +433,9 @@ class FinalizarButton(discord.ui.Button):
                 await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
             
-            fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
             
             # Finalizar la tarea
             google_sheets.finalizar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
