@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 import utils.google_sheets as google_sheets
+import asyncio
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
@@ -124,6 +125,12 @@ class TaskSelectMenu(discord.ui.Select):
                 view=TaskStartButtonView(seleccion),
                 ephemeral=True
             )
+            # Eliminar el mensaje del menú después de 20 segundos
+            await asyncio.sleep(20)
+            try:
+                await interaction.message.delete()
+            except:
+                pass
 
 class TaskSelectMenuView(discord.ui.View):
     def __init__(self):
@@ -169,7 +176,7 @@ class TaskStartButton(discord.ui.Button):
                 ''                # tiempo_pausada
             )
             
-            # Enviar confirmación al usuario
+            # Enviar confirmación efímera al usuario
             await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=True)
             
             # Enviar embed al canal de registro
@@ -179,6 +186,12 @@ class TaskStartButton(discord.ui.Button):
                     embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id, tarea_id)
                     await canal_registro.send(embed=embed, view=view)
+            
+            # Eliminar el mensaje del botón inmediatamente
+            try:
+                await interaction.message.delete()
+            except:
+                pass
             
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
@@ -216,7 +229,7 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 ''                # tiempo_pausada
             )
             
-            # Enviar confirmación al usuario
+            # Enviar confirmación efímera al usuario
             await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
             
             # Enviar embed al canal de registro
@@ -226,6 +239,13 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                     embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id, tarea_id)
                     await canal_registro.send(embed=embed, view=view)
+            
+            # Eliminar el mensaje del modal después de 20 segundos
+            await asyncio.sleep(20)
+            try:
+                await interaction.message.delete()
+            except:
+                pass
             
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):

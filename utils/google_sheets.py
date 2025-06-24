@@ -408,6 +408,30 @@ def calcular_diferencia_tiempo(inicio, fin):
         print(f'[ERROR] calcular_diferencia_tiempo: {e}')
         return '00:00:00'
 
+def actualizar_tiempo_pausado_por_id(sheet_activas, tarea_id, tiempo_agregar):
+    """
+    Actualiza el tiempo pausado acumulado de una tarea específica
+    """
+    try:
+        datos_tarea = obtener_tarea_por_id(sheet_activas, tarea_id)
+        if not datos_tarea:
+            raise Exception('No se encontró la tarea especificada.')
+        
+        tiempo_actual = datos_tarea['tiempo_pausado']
+        tiempo_nuevo = sumar_tiempo_pausado(tiempo_actual, tiempo_agregar)
+        
+        # Actualizar en la hoja
+        header = sheet_activas.get_all_values()[0]
+        tiempo_col = get_col_index(header, 'Tiempo pausada acumulado')
+        if tiempo_col is not None:
+            sheet_activas.update_cell(datos_tarea['fila_idx'], tiempo_col + 1, tiempo_nuevo)
+            return tiempo_nuevo
+        
+        return tiempo_actual
+    except Exception as e:
+        print(f'[ERROR] actualizar_tiempo_pausado_por_id: {e}')
+        return '00:00:00'
+
 def pausar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, usuario, fecha_pausa):
     """
     Pausa una tarea específica por su ID y registra el evento en el historial.
@@ -458,6 +482,29 @@ def reanudar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, usuario, fec
             raise Exception('No se encontró la tarea especificada.')
         
         if datos_tarea['estado'].lower() == 'pausada':
+            # Calcular tiempo pausado desde la última pausa
+            # Buscar la última fecha de pausa en el historial
+            rows_historial = sheet_historial.get_all_values()
+            header_historial = rows_historial[0]
+            tarea_id_col = get_col_index(header_historial, 'Tarea ID')
+            tipo_evento_col = get_col_index(header_historial, 'Tipo de evento (Inicio, Pausa, Reanudación, Finalización)')
+            fecha_col = get_col_index(header_historial, 'Fecha/hora de inicio')
+            
+            ultima_pausa = None
+            for row in reversed(rows_historial[1:]):
+                if (len(row) > tarea_id_col and row[tarea_id_col] == tarea_id and 
+                    len(row) > tipo_evento_col and row[tipo_evento_col] == 'Pausa'):
+                    ultima_pausa = row[fecha_col] if len(row) > fecha_col else None
+                    break
+            
+            # Calcular tiempo pausado
+            tiempo_pausado_agregar = '00:00:00'
+            if ultima_pausa:
+                tiempo_pausado_agregar = calcular_diferencia_tiempo(ultima_pausa, fecha_reanudacion)
+            
+            # Actualizar tiempo pausado acumulado
+            tiempo_pausado_nuevo = actualizar_tiempo_pausado_por_id(sheet_activas, tarea_id, tiempo_pausado_agregar)
+            
             # Actualizar estado a en proceso
             header = sheet_activas.get_all_values()[0]
             estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
@@ -474,7 +521,7 @@ def reanudar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, usuario, fec
                 fecha_reanudacion,  # Fecha del evento
                 'En proceso',
                 'Reanudación',
-                datos_tarea['tiempo_pausado']
+                tiempo_pausado_nuevo
             )
             return True
         elif datos_tarea['estado'].lower() == 'en proceso':
