@@ -225,68 +225,84 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
 def funcion_google_sheets():
     pass 
 
-def registrar_tarea_activa(sheet, user_id, usuario, tarea, observaciones, inicio):
+def normaliza_columna(nombre):
+    return str(nombre).strip().replace(' ', '').lower()
+
+# Columnas para Tareas Activas
+COLUMNAS_TAREAS_ACTIVAS = [
+    'Usuario ID', 'Usuario', 'Tarea', 'Observaciones', 'Estado (En proceso, Pausada)',
+    'Fecha/hora de inicio', 'Fecha/hora de pausa (opcional)', 'Tiempo pausada acumulado (opcional)'
+]
+# Columnas para Historial
+COLUMNAS_HISTORIAL = [
+    'Usuario ID', 'Usuario', 'Tarea', 'Observaciones', 'Estado (En proceso, Pausada, Finalizada)',
+    'Fecha/hora del evento', 'Tipo de evento (Inicio, Pausa, Reanudación, Finalización)', 'Tiempo pausada acumulado (opcional, útil para auditoría)'
+]
+
+def get_col_index(header, col_name):
+    col_norm = normaliza_columna(col_name)
+    for i, h in enumerate(header):
+        if normaliza_columna(h) == col_norm:
+            return i
+    return None
+
+def registrar_tarea_activa(sheet, user_id, usuario, tarea, observaciones, inicio, estado='En proceso'):
     """
     Registra o actualiza una tarea activa para un usuario en la hoja 'Tareas Activas'.
-    Si el usuario ya tiene una tarea activa, la actualiza; si no, la agrega.
     """
     try:
         rows = sheet.get_all_values()
         if not rows:
-            header = ['UsuarioID', 'Usuario', 'Tarea', 'Observaciones', 'Inicio']
-            sheet.append_row(header)
-            rows = [header]
+            sheet.append_row(COLUMNAS_TAREAS_ACTIVAS)
+            rows = [COLUMNAS_TAREAS_ACTIVAS]
         header = rows[0]
-        user_col = next((i for i, h in enumerate(header) if h.strip().lower() == 'usuarioid'), None)
+        user_col = get_col_index(header, 'Usuario ID')
         if user_col is None:
-            raise Exception('No se encontró la columna UsuarioID en la hoja de Tareas Activas.')
+            raise Exception('No se encontró la columna Usuario ID en la hoja de Tareas Activas.')
         # Buscar si ya existe
         for idx, row in enumerate(rows[1:], start=2):
             if len(row) > user_col and row[user_col] == user_id:
                 # Actualizar fila existente
-                sheet.update(f'A{idx}:E{idx}', [[user_id, usuario, tarea, observaciones, inicio]])
+                nueva_fila = [user_id, usuario, tarea, observaciones, estado, inicio, '', '']
+                sheet.update(f'A{idx}:H{idx}', [nueva_fila])
                 return 'actualizado'
         # Si no existe, agregar
-        sheet.append_row([user_id, usuario, tarea, observaciones, inicio])
+        nueva_fila = [user_id, usuario, tarea, observaciones, estado, inicio, '', '']
+        sheet.append_row(nueva_fila)
         return 'nuevo'
     except Exception as e:
         print(f'[ERROR] registrar_tarea_activa: {e}')
         raise
 
-
 def usuario_tiene_tarea_activa(sheet, user_id):
-    """
-    Devuelve True si el usuario tiene una tarea activa en la hoja 'Tareas Activas'.
-    """
     try:
         rows = sheet.get_all_values()
         if not rows or len(rows) < 2:
             return False
         header = rows[0]
-        user_col = next((i for i, h in enumerate(header) if h.strip().lower() == 'usuarioid'), None)
+        user_col = get_col_index(header, 'Usuario ID')
         if user_col is None:
             return False
         for row in rows[1:]:
             if len(row) > user_col and row[user_col] == user_id:
-                return True
+                # Solo si el estado es 'En proceso' o 'Pausada'
+                estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
+                if estado_col is not None and len(row) > estado_col:
+                    estado = row[estado_col].strip().lower()
+                    if estado in ['en proceso', 'pausada']:
+                        return True
         return False
     except Exception as e:
         print(f'[ERROR] usuario_tiene_tarea_activa: {e}')
         raise
 
-
-def agregar_evento_historial(sheet, user_id, usuario, tarea, observaciones, inicio, fin=None, estado=None):
-    """
-    Agrega un evento al historial de tareas.
-    """
+def agregar_evento_historial(sheet, user_id, usuario, tarea, observaciones, fecha_evento, estado, tipo_evento, tiempo_pausada=''):
     try:
-        header = ['UsuarioID', 'Usuario', 'Tarea', 'Observaciones', 'Inicio', 'Fin', 'Estado']
         rows = sheet.get_all_values()
         if not rows:
-            sheet.append_row(header)
-        fin = fin or ''
-        estado = estado or ''
-        sheet.append_row([user_id, usuario, tarea, observaciones, inicio, fin, estado])
+            sheet.append_row(COLUMNAS_HISTORIAL)
+        nueva_fila = [user_id, usuario, tarea, observaciones, estado, fecha_evento, tipo_evento, tiempo_pausada]
+        sheet.append_row(nueva_fila)
     except Exception as e:
         print(f'[ERROR] agregar_evento_historial: {e}')
         raise 
