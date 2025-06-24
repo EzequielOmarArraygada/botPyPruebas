@@ -54,6 +54,12 @@ async def on_ready():
     else:
         print("La verificación periódica de errores en la hoja de búsqueda no se iniciará debido a la falta de configuración.")
 
+    try:
+        synced = await bot.tree.sync()
+        print(f'Slash commands sincronizados: {len(synced)}')
+    except Exception as e:
+        print(f'Error al sincronizar slash commands: {e}')
+
 @tasks.loop(seconds=config.ERROR_CHECK_INTERVAL_MS / 1000)
 async def check_errors():
     """Tarea periódica para verificar errores en Google Sheets"""
