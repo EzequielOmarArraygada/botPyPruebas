@@ -105,12 +105,35 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
             members = guild.members  # fallback si ya están en caché
         
         header_row = rows[0]
-        # Buscar los índices de las columnas por título
-        error_column_index = next((i for i, h in enumerate(header_row) if h and str(h).strip().lower() == 'error'), None)
-        notified_column_index = next((i for i, h in enumerate(header_row) if h and str(h).strip().lower() == 'errorenviocheck'), None)
+        print(f"Encabezados encontrados en la hoja: {header_row}")
+        
+        # Buscar los índices de las columnas por título (más robusto)
+        def normaliza_encabezado(h):
+            if not h:
+                return ''
+            # Eliminar caracteres invisibles y normalizar
+            return str(h).strip().replace('\u200b', '').replace('\ufeff', '').lower()
+        
+        error_column_index = None
+        notified_column_index = None
+        
+        for i, header in enumerate(header_row):
+            normalized_header = normaliza_encabezado(header)
+            print(f"Columna {i}: '{header}' -> normalizado: '{normalized_header}'")
+            
+            if normalized_header == 'error':
+                error_column_index = i
+                print(f"Columna ERROR encontrada en índice {i}")
+            elif normalized_header == 'errorenviocheck':
+                notified_column_index = i
+                print(f"Columna ErrorEnvioCheck encontrada en índice {i}")
+        
         if error_column_index is None or notified_column_index is None:
             print('No se encontraron las columnas "ERROR" o "ErrorEnvioCheck" en la hoja.')
+            print(f'Columna ERROR encontrada: {error_column_index is not None}')
+            print(f'Columna ErrorEnvioCheck encontrada: {notified_column_index is not None}')
             return
+        
         for i, row in enumerate(rows[1:], start=2):
             error_value = str(row[error_column_index]).strip() if len(row) > error_column_index and row[error_column_index] else ''
             notified_value = str(row[notified_column_index]).strip() if len(row) > notified_column_index and row[notified_column_index] else ''
