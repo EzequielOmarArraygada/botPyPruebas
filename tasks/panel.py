@@ -33,10 +33,6 @@ class TaskPanel(commands.Cog):
         await canal.send(embed=embed, view=view)
         await interaction.response.send_message('Panel publicado correctamente.', ephemeral=True)
 
-    async def cog_load(self):
-        # Registrar el comando en el árbol de comandos
-        self.bot.tree.add_command(self.setup_panel_tareas)
-
 class TaskPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
