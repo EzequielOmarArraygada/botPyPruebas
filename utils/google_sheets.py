@@ -72,6 +72,9 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
     :param guild_id: ID del servidor de Discord
     """
     print('Iniciando verificación de errores en Google Sheets...')
+    print(f'Hoja: {sheet.title}')
+    print(f'Rango solicitado: {sheet_range}')
+    
     try:
         # Limpiar el rango si tiene formato incorrecto
         if '!' in sheet_range:
@@ -86,10 +89,24 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
             print(f"Error: Rango inválido '{sheet_range}'. Debe tener formato 'A:K'")
             return
         
+        print(f'Intentando leer rango: {sheet_range}')
         rows = sheet.get(sheet_range)
-        if not rows or len(rows) <= 1:
-            print('No hay datos de casos en la hoja para verificar.')
+        print(f'Filas leídas: {len(rows) if rows else 0}')
+        
+        if not rows:
+            print('No se leyeron datos de la hoja. Verificando si la hoja tiene datos...')
+            # Intentar leer un rango más amplio para ver si hay datos
+            try:
+                test_rows = sheet.get('A1:Z10')
+                print(f'Datos de prueba (A1:Z10): {test_rows}')
+            except Exception as e:
+                print(f'Error al leer datos de prueba: {e}')
             return
+        
+        if len(rows) <= 1:
+            print('Solo hay una fila o menos en la hoja. Datos encontrados:', rows)
+            return
+            
         cases_channel = bot.get_channel(target_channel_id)
         if not cases_channel:
             print(f"Error: No se pudo encontrar el canal de Discord con ID {target_channel_id}.")
@@ -106,6 +123,7 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         
         header_row = rows[0]
         print(f"Encabezados encontrados en la hoja: {header_row}")
+        print(f"Número de columnas en encabezados: {len(header_row)}")
         
         # Buscar los índices de las columnas por título (más robusto)
         def normaliza_encabezado(h):
