@@ -4,11 +4,27 @@ from discord.ext import commands
 from discord import app_commands
 import os
 import config
+import json
+from pathlib import Path
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(os.getenv('TARGET_CHANNEL_ID_TAREAS', '0'))
 guild_id = int(getattr(config, 'GUILD_ID', 0))
 print(f'[DEBUG] GUILD_ID usado para comandos slash: {guild_id}')
+
+TAREAS_JSON_PATH = Path('data/tareas_activas.json')
+TAREAS_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+def cargar_tareas_activas():
+    if not TAREAS_JSON_PATH.exists():
+        with open(TAREAS_JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump({}, f)
+        return {}
+    with open(TAREAS_JSON_PATH, 'r', encoding='utf-8') as f:
+        try:
+            return json.load(f)
+        except Exception:
+            return {}
 
 def guilds_decorator():
     if guild_id:
@@ -60,6 +76,14 @@ class TaskRegisterButton(discord.ui.Button):
         super().__init__(label='Registrar nueva tarea', style=discord.ButtonStyle.primary)
 
     async def callback(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        tareas_activas = cargar_tareas_activas()
+        if user_id in tareas_activas:
+            await interaction.response.send_message(
+                '⚠️ Ya tienes una tarea activa. Finalízala antes de iniciar una nueva.',
+                ephemeral=True
+            )
+            return
         await interaction.response.send_message(
             'Selecciona la tarea que vas a realizar:',
             view=TaskSelectMenuView(),
