@@ -47,12 +47,12 @@ async def on_ready():
     print("Conectado a Discord.")
     
     # Iniciar la verificación periódica de errores en la hoja
-    if (config.SPREADSHEET_ID_CASOS and config.SHEET_RANGE_CASOS_READ and 
+    if (config.SPREADSHEET_ID_BUSCAR_CASO and config.SHEET_RANGE_CASOS_READ and 
         config.TARGET_CHANNEL_ID_CASOS and config.GUILD_ID):
-        print(f"Iniciando verificación periódica de errores cada {config.ERROR_CHECK_INTERVAL_MS / 1000} segundos en la hoja de Casos BGH.")
+        print(f"Iniciando verificación periódica de errores cada {config.ERROR_CHECK_INTERVAL_MS / 1000} segundos en la hoja de búsqueda.")
         check_errors.start()
     else:
-        print("La verificación periódica de errores en la hoja de Casos BGH no se iniciará debido a la falta de configuración.")
+        print("La verificación periódica de errores en la hoja de búsqueda no se iniciará debido a la falta de configuración.")
 
 @tasks.loop(seconds=config.ERROR_CHECK_INTERVAL_MS / 1000)
 async def check_errors():
@@ -60,8 +60,8 @@ async def check_errors():
     if sheets_instance:
         try:
             # Verificar que las configuraciones necesarias estén disponibles
-            if not config.SPREADSHEET_ID_CASOS:
-                print("Error: SPREADSHEET_ID_CASOS no está configurado")
+            if not config.SPREADSHEET_ID_BUSCAR_CASO:
+                print("Error: SPREADSHEET_ID_BUSCAR_CASO no está configurado")
                 return
             if not config.SHEET_RANGE_CASOS_READ:
                 print("Error: SHEET_RANGE_CASOS_READ no está configurado")
@@ -75,7 +75,7 @@ async def check_errors():
                 
             # Obtener la hoja específica
             try:
-                spreadsheet = sheets_instance.open_by_key(config.SPREADSHEET_ID_CASOS)
+                spreadsheet = sheets_instance.open_by_key(config.SPREADSHEET_ID_BUSCAR_CASO)
                 # Usar la primera hoja si no hay una específica configurada
                 sheet_name = getattr(config, 'SHEET_NAME_CASOS', None)
                 if sheet_name:
@@ -83,7 +83,7 @@ async def check_errors():
                 else:
                     sheet = spreadsheet.sheet1
             except Exception as sheet_error:
-                print(f"Error al abrir la hoja de casos: {sheet_error}")
+                print(f"Error al abrir la hoja de búsqueda: {sheet_error}")
                 return
                 
             await check_sheet_for_errors(
