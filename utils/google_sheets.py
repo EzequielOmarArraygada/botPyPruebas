@@ -231,12 +231,12 @@ def normaliza_columna(nombre):
 # Columnas para Tareas Activas
 COLUMNAS_TAREAS_ACTIVAS = [
     'Usuario ID', 'Usuario', 'Tarea', 'Observaciones', 'Estado (En proceso, Pausada)',
-    'Fecha/hora de inicio', 'Fecha/hora de pausa (opcional)', 'Tiempo pausada acumulado (opcional)'
+    'Fecha/hora de inicio', 'Fecha/hora de finalización', 'Tiempo pausada acumulado'
 ]
 # Columnas para Historial
 COLUMNAS_HISTORIAL = [
     'Usuario ID', 'Usuario', 'Tarea', 'Observaciones', 'Estado (En proceso, Pausada, Finalizada)',
-    'Fecha/hora del evento', 'Tipo de evento (Inicio, Pausa, Reanudación, Finalización)', 'Tiempo pausada acumulado (opcional, útil para auditoría)'
+    'Fecha/hora de inicio', 'Tipo de evento (Inicio, Pausa, Reanudación, Finalización)', 'Tiempo pausada acumulado'
 ]
 
 def get_col_index(header, col_name):
@@ -272,7 +272,7 @@ def registrar_tarea_activa(sheet, user_id, usuario, tarea, observaciones, inicio
                         raise Exception(f'El usuario ya tiene una tarea activa con estado "{estado_existente}". Debe finalizar la tarea actual antes de iniciar una nueva.')
         
         # Si no tiene tarea activa, agregar la nueva
-        nueva_fila = [user_id, usuario, tarea, observaciones, estado, inicio, '', '']
+        nueva_fila = [user_id, usuario, tarea, observaciones, estado, inicio, '', '00:00:00']
         sheet.append_row(nueva_fila)
         return 'nuevo'
     except Exception as e:
@@ -290,7 +290,7 @@ def usuario_tiene_tarea_activa(sheet, user_id):
             return False
         for row in rows[1:]:
             if len(row) > user_col and row[user_col] == user_id:
-                # Solo si el estado es 'En proceso' o 'Pausada'
+                # Solo si el estado es 'En proceso' o 'Pausada' (no 'Finalizada')
                 estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
                 if estado_col is not None and len(row) > estado_col:
                     estado = row[estado_col].strip().lower()
@@ -311,6 +311,90 @@ def agregar_evento_historial(sheet, user_id, usuario, tarea, observaciones, fech
     except Exception as e:
         print(f'[ERROR] agregar_evento_historial: {e}')
         raise
+
+def obtener_datos_tarea_activa(sheet, user_id):
+    """
+    Obtiene los datos de la tarea activa de un usuario.
+    """
+    try:
+        rows = sheet.get_all_values()
+        if not rows or len(rows) < 2:
+            return None
+        
+        header = rows[0]
+        user_col = get_col_index(header, 'Usuario ID')
+        
+        if user_col is None:
+            return None
+        
+        for row in rows[1:]:
+            if len(row) > user_col and row[user_col] == user_id:
+                return {
+                    'usuario': row[get_col_index(header, 'Usuario')] if len(row) > get_col_index(header, 'Usuario') else '',
+                    'tarea': row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else '',
+                    'observaciones': row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else '',
+                    'estado': row[get_col_index(header, 'Estado (En proceso, Pausada)')] if len(row) > get_col_index(header, 'Estado (En proceso, Pausada)') else '',
+                    'inicio': row[get_col_index(header, 'Fecha/hora de inicio')] if len(row) > get_col_index(header, 'Fecha/hora de inicio') else '',
+                    'tiempo_pausado': row[get_col_index(header, 'Tiempo pausada acumulado')] if len(row) > get_col_index(header, 'Tiempo pausada acumulado') else '00:00:00'
+                }
+        
+        return None
+    except Exception as e:
+        print(f'[ERROR] obtener_datos_tarea_activa: {e}')
+        return None
+
+def sumar_tiempo_pausado(tiempo_actual, tiempo_agregar):
+    """
+    Suma dos tiempos en formato HH:MM:SS
+    """
+    try:
+        def tiempo_a_segundos(tiempo_str):
+            if not tiempo_str or tiempo_str == '':
+                return 0
+            partes = tiempo_str.split(':')
+            if len(partes) == 3:
+                return int(partes[0]) * 3600 + int(partes[1]) * 60 + int(partes[2])
+            return 0
+        
+        def segundos_a_tiempo(segundos):
+            horas = segundos // 3600
+            minutos = (segundos % 3600) // 60
+            segs = segundos % 60
+            return f"{horas:02d}:{minutos:02d}:{segs:02d}"
+        
+        segundos_actual = tiempo_a_segundos(tiempo_actual)
+        segundos_agregar = tiempo_a_segundos(tiempo_agregar)
+        total_segundos = segundos_actual + segundos_agregar
+        
+        return segundos_a_tiempo(total_segundos)
+    except Exception as e:
+        print(f'[ERROR] sumar_tiempo_pausado: {e}')
+        return '00:00:00'
+
+def calcular_diferencia_tiempo(inicio, fin):
+    """
+    Calcula la diferencia entre dos fechas en formato HH:MM:SS
+    """
+    try:
+        from datetime import datetime
+        
+        # Parsear las fechas
+        inicio_dt = datetime.strptime(inicio, '%d/%m/%Y %H:%M:%S')
+        fin_dt = datetime.strptime(fin, '%d/%m/%Y %H:%M:%S')
+        
+        # Calcular diferencia
+        diferencia = fin_dt - inicio_dt
+        segundos_totales = int(diferencia.total_seconds())
+        
+        # Convertir a formato HH:MM:SS
+        horas = segundos_totales // 3600
+        minutos = (segundos_totales % 3600) // 60
+        segundos = segundos_totales % 60
+        
+        return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+    except Exception as e:
+        print(f'[ERROR] calcular_diferencia_tiempo: {e}')
+        return '00:00:00'
 
 def pausar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fecha_pausa):
     """
@@ -334,12 +418,13 @@ def pausar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fecha_
                 estado_actual = row[estado_col].strip().lower() if len(row) > estado_col else ''
                 
                 if estado_actual == 'en proceso':
-                    # Actualizar estado a pausada
-                    sheet_activas.update_cell(idx, estado_col + 1, 'Pausada')
-                    
                     # Obtener datos de la tarea para el historial
                     tarea = row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else ''
                     observaciones = row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else ''
+                    tiempo_pausado_actual = row[get_col_index(header, 'Tiempo pausada acumulado')] if len(row) > get_col_index(header, 'Tiempo pausada acumulado') else '00:00:00'
+                    
+                    # Actualizar estado a pausada
+                    sheet_activas.update_cell(idx, estado_col + 1, 'Pausada')
                     
                     # Registrar evento en historial
                     agregar_evento_historial(
@@ -348,10 +433,10 @@ def pausar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fecha_
                         usuario,
                         tarea,
                         observaciones,
-                        fecha_pausa,
+                        fecha_pausa,  # Fecha del evento
                         'Pausada',
                         'Pausa',
-                        ''
+                        tiempo_pausado_actual
                     )
                     return True
                 elif estado_actual == 'pausada':
@@ -386,12 +471,13 @@ def reanudar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fech
                 estado_actual = row[estado_col].strip().lower() if len(row) > estado_col else ''
                 
                 if estado_actual == 'pausada':
-                    # Actualizar estado a en proceso
-                    sheet_activas.update_cell(idx, estado_col + 1, 'En proceso')
-                    
                     # Obtener datos de la tarea para el historial
                     tarea = row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else ''
                     observaciones = row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else ''
+                    tiempo_pausado_actual = row[get_col_index(header, 'Tiempo pausada acumulado')] if len(row) > get_col_index(header, 'Tiempo pausada acumulado') else '00:00:00'
+                    
+                    # Actualizar estado a en proceso
+                    sheet_activas.update_cell(idx, estado_col + 1, 'En proceso')
                     
                     # Registrar evento en historial
                     agregar_evento_historial(
@@ -400,10 +486,10 @@ def reanudar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fech
                         usuario,
                         tarea,
                         observaciones,
-                        fecha_reanudacion,
+                        fecha_reanudacion,  # Fecha del evento
                         'En proceso',
                         'Reanudación',
-                        ''
+                        tiempo_pausado_actual
                     )
                     return True
                 elif estado_actual == 'en proceso':
@@ -428,8 +514,9 @@ def finalizar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fec
         header = rows[0]
         user_col = get_col_index(header, 'Usuario ID')
         estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
+        finalizacion_col = get_col_index(header, 'Fecha/hora de finalización')
         
-        if user_col is None or estado_col is None:
+        if user_col is None or estado_col is None or finalizacion_col is None:
             raise Exception('No se encontraron las columnas necesarias en la hoja de Tareas Activas.')
         
         # Buscar la tarea del usuario
@@ -438,12 +525,14 @@ def finalizar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fec
                 estado_actual = row[estado_col].strip().lower() if len(row) > estado_col else ''
                 
                 if estado_actual in ['en proceso', 'pausada']:
-                    # Obtener datos de la tarea para el historial antes de eliminar
+                    # Obtener datos de la tarea para el historial antes de actualizar
                     tarea = row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else ''
                     observaciones = row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else ''
+                    tiempo_pausado_actual = row[get_col_index(header, 'Tiempo pausada acumulado')] if len(row) > get_col_index(header, 'Tiempo pausada acumulado') else '00:00:00'
                     
-                    # Eliminar la fila de tareas activas
-                    sheet_activas.delete_rows(idx)
+                    # Actualizar estado a finalizada y agregar fecha de finalización
+                    sheet_activas.update_cell(idx, estado_col + 1, 'Finalizada')
+                    sheet_activas.update_cell(idx, finalizacion_col + 1, fecha_finalizacion)
                     
                     # Registrar evento en historial
                     agregar_evento_historial(
@@ -452,10 +541,10 @@ def finalizar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fec
                         usuario,
                         tarea,
                         observaciones,
-                        fecha_finalizacion,
+                        fecha_finalizacion,  # Fecha del evento
                         'Finalizada',
                         'Finalización',
-                        ''
+                        tiempo_pausado_actual
                     )
                     return True
                 else:
@@ -464,34 +553,4 @@ def finalizar_tarea_activa(sheet_activas, sheet_historial, user_id, usuario, fec
         raise Exception('No se encontró una tarea activa para este usuario.')
     except Exception as e:
         print(f'[ERROR] finalizar_tarea_activa: {e}')
-        raise
-
-def obtener_datos_tarea_activa(sheet, user_id):
-    """
-    Obtiene los datos de la tarea activa de un usuario.
-    """
-    try:
-        rows = sheet.get_all_values()
-        if not rows or len(rows) < 2:
-            return None
-        
-        header = rows[0]
-        user_col = get_col_index(header, 'Usuario ID')
-        
-        if user_col is None:
-            return None
-        
-        for row in rows[1:]:
-            if len(row) > user_col and row[user_col] == user_id:
-                return {
-                    'usuario': row[get_col_index(header, 'Usuario')] if len(row) > get_col_index(header, 'Usuario') else '',
-                    'tarea': row[get_col_index(header, 'Tarea')] if len(row) > get_col_index(header, 'Tarea') else '',
-                    'observaciones': row[get_col_index(header, 'Observaciones')] if len(row) > get_col_index(header, 'Observaciones') else '',
-                    'estado': row[get_col_index(header, 'Estado (En proceso, Pausada)')] if len(row) > get_col_index(header, 'Estado (En proceso, Pausada)') else '',
-                    'inicio': row[get_col_index(header, 'Fecha/hora de inicio')] if len(row) > get_col_index(header, 'Fecha/hora de inicio') else ''
-                }
-        
-        return None
-    except Exception as e:
-        print(f'[ERROR] obtener_datos_tarea_activa: {e}')
-        return None 
+        raise 

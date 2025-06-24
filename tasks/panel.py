@@ -175,7 +175,7 @@ class TaskStartButton(discord.ui.Button):
             if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
                 canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
                 if canal_registro:
-                    embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso')
+                    embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id)
                     await canal_registro.send(embed=embed, view=view)
             
@@ -221,7 +221,7 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
             if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
                 canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
                 if canal_registro:
-                    embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso')
+                    embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id)
                     await canal_registro.send(embed=embed, view=view)
             
@@ -231,14 +231,24 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
             else:
                 await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
 
-def crear_embed_tarea(user, tarea, observaciones, inicio, estado):
+def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado='00:00:00'):
     """
     Crea un embed visualmente atractivo para mostrar los datos de una tarea.
     """
+    # Determinar color según estado
+    if estado.lower() == 'en proceso':
+        color = discord.Color.green()
+    elif estado.lower() == 'pausada':
+        color = discord.Color.orange()
+    elif estado.lower() == 'finalizada':
+        color = discord.Color.red()
+    else:
+        color = discord.Color.blue()
+    
     embed = discord.Embed(
         title=f'📋 Tarea Registrada: {tarea}',
         description='Se ha registrado una nueva tarea en el sistema.',
-        color=discord.Color.green() if estado == 'En proceso' else discord.Color.orange(),
+        color=color,
         timestamp=datetime.now()
     )
     
@@ -273,7 +283,17 @@ def crear_embed_tarea(user, tarea, observaciones, inicio, estado):
         inline=True
     )
     
-    embed.set_footer(text='Usa los botones de abajo para controlar la tarea')
+    if tiempo_pausado and tiempo_pausado != '00:00:00':
+        embed.add_field(
+            name='⏸️ Tiempo Pausado',
+            value=tiempo_pausado,
+            inline=True
+        )
+    
+    if estado.lower() != 'finalizada':
+        embed.set_footer(text='Usa los botones de abajo para controlar la tarea')
+    else:
+        embed.set_footer(text='Tarea finalizada')
     
     return embed
 
@@ -319,7 +339,7 @@ class PausarReanudarButton(discord.ui.Button):
                 self.custom_id = f'reanudar_{self.user_id}'
                 
                 # Actualizar el embed
-                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada')
+                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.orange()
                 
                 await interaction.response.edit_message(embed=embed, view=self.view)
@@ -335,7 +355,7 @@ class PausarReanudarButton(discord.ui.Button):
                 self.custom_id = f'pausar_{self.user_id}'
                 
                 # Actualizar el embed
-                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso')
+                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.green()
                 
                 await interaction.response.edit_message(embed=embed, view=self.view)
@@ -361,14 +381,26 @@ class FinalizarButton(discord.ui.Button):
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
             
+            # Obtener datos actuales de la tarea
+            datos_tarea = google_sheets.obtener_datos_tarea_activa(sheet_activas, self.user_id)
+            if not datos_tarea:
+                await interaction.response.send_message('❌ No se encontró la tarea activa.', ephemeral=True)
+                return
+            
             fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
             
             # Finalizar la tarea
             google_sheets.finalizar_tarea_activa(sheet_activas, sheet_historial, self.user_id, str(interaction.user), fecha_actual)
             
-            # Eliminar el mensaje
-            await interaction.message.delete()
-            await interaction.response.send_message('✅ Tarea finalizada correctamente.', ephemeral=True)
+            # Actualizar el embed con estado finalizado
+            embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Finalizada', datos_tarea['tiempo_pausado'])
+            embed.color = discord.Color.red()
+            
+            # Crear una nueva vista sin botones para tareas finalizadas
+            view = discord.ui.View(timeout=None)
+            
+            await interaction.response.edit_message(embed=embed, view=view)
+            await interaction.followup.send('✅ Tarea finalizada correctamente.', ephemeral=True)
             
         except Exception as e:
             await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
