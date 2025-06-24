@@ -469,6 +469,6 @@ class FinalizarButton(discord.ui.Button):
 async def setup(bot):
     print('[DEBUG] Ejecutando setup() de TaskPanel')
     # Registrar las views persistentes para los botones de tareas
-    bot.add_view(TareaControlView())
+    # Nota: TareaControlView se registra automáticamente cuando se crea con custom_id
     await bot.add_cog(TaskPanel(bot))
     print('[DEBUG] TaskPanel Cog agregado al bot') 
