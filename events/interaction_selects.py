@@ -10,6 +10,7 @@ class CompleteCasoButton(Button):
     def __init__(self):
         super().__init__(label="Completar detalles del caso", style=discord.ButtonStyle.primary, custom_id="completeCasoDetailsButton")
     async def callback(self, interaction):
+        print('DEBUG: callback de CompleteCasoButton ejecutado')
         pass  # El flujo real lo maneja el listener
 
 class CompleteCasoView(View):
@@ -28,28 +29,34 @@ class InteractionSelects(commands.Cog):
             interaction.data and 
             interaction.data.get('custom_id') == 'casoTipoSolicitudSelect'):
             
+            print('DEBUG: Interacción recibida del select menu')
             user_id = str(interaction.user.id)
             pending_data = get_user_state(user_id)
+            print(f'DEBUG: Estado pendiente para usuario {user_id}: {pending_data}')
             if pending_data and pending_data.get('type') == 'caso' and pending_data.get('paso') == 1:
                 try:
-                    # Type assertion for select menu data
                     select_data = interaction.data
+                    print(f'DEBUG: Datos del select: {select_data}')
                     if 'values' in select_data and select_data['values']:
                         selected_tipo = select_data['values'][0]
-                        print(f"Tipo seleccionado: {selected_tipo}")
-                        # Guardar el tipo de solicitud y avanzar el paso
+                        print(f"DEBUG: Tipo seleccionado: {selected_tipo}")
                         set_user_state(user_id, {
                             "type": "caso",
                             "paso": 2,
                             "tipoSolicitud": selected_tipo
                         })
-                        # Usar la View bien definida
+                        print('DEBUG: Estado actualizado, creando CompleteCasoView...')
                         view = CompleteCasoView()
-                        await interaction.response.send_message(
-                            content=f"Tipo de solicitud seleccionado: **{selected_tipo}**\n\nHaz clic en el botón para completar los detalles del caso.",
-                            view=view,
-                            ephemeral=True
-                        )
+                        print('DEBUG: CompleteCasoView creada, enviando mensaje con botón...')
+                        try:
+                            await interaction.response.send_message(
+                                content=f"Tipo de solicitud seleccionado: **{selected_tipo}**\n\nHaz clic en el botón para completar los detalles del caso.",
+                                view=view,
+                                ephemeral=True
+                            )
+                            print('DEBUG: Mensaje con botón enviado correctamente.')
+                        except Exception as e:
+                            print(f'ERROR al enviar el mensaje con el botón: {e}')
                         return
                     else:
                         raise ValueError("No se encontraron valores en la selección")
