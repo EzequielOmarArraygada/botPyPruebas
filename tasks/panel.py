@@ -66,13 +66,18 @@ class TaskPanel(commands.Cog):
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message('No tienes permisos para usar este comando.', ephemeral=True)
             return
-        if target_channel_id == 0:
+        
+        # Obtener el canal de tareas desde la configuración
+        target_channel_id = getattr(config, 'TARGET_CHANNEL_ID_TAREAS', None)
+        if not target_channel_id:
             await interaction.response.send_message('La variable de entorno TARGET_CHANNEL_ID_TAREAS no está configurada.', ephemeral=True)
             return
-        canal = interaction.guild.get_channel(target_channel_id)
+        
+        canal = interaction.guild.get_channel(int(target_channel_id))
         if not canal:
             await interaction.response.send_message('No se encontró el canal configurado.', ephemeral=True)
             return
+        
         embed = discord.Embed(
             title='Panel de Registro de Tareas',
             description='Presiona el botón para registrar una nueva tarea.',
@@ -474,7 +479,8 @@ async def setup(bot):
     # Registrar las views persistentes para los botones de tareas
     # Nota: TareaControlView se registra automáticamente cuando se crea con custom_id
     await bot.add_cog(TaskPanel(bot))
-    print('[DEBUG] TaskPanel Cog agregado al bot')
+    await bot.add_cog(PanelComandos(bot))
+    print('[DEBUG] TaskPanel y PanelComandos Cogs agregados al bot')
 
 class PanelComandosView(discord.ui.View):
     def __init__(self):
@@ -665,8 +671,4 @@ class PanelComandos(commands.Cog):
         )
         view = PanelComandosView()
         await canal.send(embed=embed, view=view)
-        await interaction.response.send_message('Panel de comandos publicado correctamente.', ephemeral=True)
-
-async def setup(bot):
-    await bot.add_cog(PanelComandos(bot))
-    # ... resto del setup ... 
+        await interaction.response.send_message('Panel de comandos publicado correctamente.', ephemeral=True) 
