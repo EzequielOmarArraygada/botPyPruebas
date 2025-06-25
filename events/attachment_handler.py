@@ -234,7 +234,7 @@ class AttachmentHandler(commands.Cog):
                             norm = normaliza_columna(col_name)
                             if norm == normaliza_columna('Número de pedido'):
                                 pedido_col = idx
-                            if norm == normaliza_columna('Número de caso'):
+                            if norm == normaliza_columna('Caso'):
                                 caso_col = idx
                             if norm == normaliza_columna('Fecha/Hora'):
                                 fecha_col = idx
