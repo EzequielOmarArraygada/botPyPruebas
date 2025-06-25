@@ -221,12 +221,23 @@ class AttachmentHandler(commands.Cog):
                     caso_info = "N/A"
                     fecha_carga = "N/A"
                     
+                    def normaliza_columna(nombre):
+                        return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
+                    
                     if rows and len(rows) > 1:
                         header_row = rows[0]
-                        pedido_col = google_sheets.get_col_index(header_row, 'Número de Pedido')
-                        caso_col = google_sheets.get_col_index(header_row, 'Número de Caso')
-                        fecha_col = google_sheets.get_col_index(header_row, 'Fecha')
-                        
+                        # Buscar columnas robustamente
+                        pedido_col = None
+                        caso_col = None
+                        fecha_col = None
+                        for idx, col_name in enumerate(header_row):
+                            norm = normaliza_columna(col_name)
+                            if norm == normaliza_columna('Número de pedido'):
+                                pedido_col = idx
+                            if norm == normaliza_columna('Número de caso'):
+                                caso_col = idx
+                            if norm == normaliza_columna('Fecha/Hora'):
+                                fecha_col = idx
                         if pedido_col is not None:
                             for row in rows[1:]:
                                 if len(row) > pedido_col and str(row[pedido_col]).strip() == pedido:
