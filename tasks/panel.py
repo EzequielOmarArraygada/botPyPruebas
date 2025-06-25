@@ -568,7 +568,7 @@ class FacturaAButton(discord.ui.Button):
             if canal:
                 msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
                 # No enviar mensaje efímero en el panel de comandos
-                await asyncio.sleep(300)
+                await asyncio.sleep(120)
                 try:
                     await msg.delete()
                 except:
@@ -589,7 +589,7 @@ class AgregarCasoButton(discord.ui.Button):
             if canal:
                 msg = await canal.send(f'📝 {interaction.user.mention}, haz clic en el botón para iniciar el registro de un caso:', view=IniciarCasoView(interaction.user.id))
                 # No enviar mensaje efímero en el panel de comandos
-                await asyncio.sleep(300)
+                await asyncio.sleep(120)
                 try:
                     await msg.delete()
                 except:
@@ -609,7 +609,7 @@ class TrackingButton(discord.ui.Button):
             canal = interaction.guild.get_channel(canal_id)
             if canal:
                 msg = await canal.send(f'📦 {interaction.user.mention}, para consultar el estado de un envío, usa el comando `/tracking` en este canal.')
-                await asyncio.sleep(300)
+                await asyncio.sleep(120)
                 try:
                     await msg.delete()
                 except:
@@ -629,7 +629,7 @@ class BuscarCasoButton(discord.ui.Button):
             canal = interaction.guild.get_channel(canal_id)
             if canal:
                 msg = await canal.send(f'🔍 {interaction.user.mention}, para buscar un caso, usa el comando `/buscar-caso` en este canal.')
-                await asyncio.sleep(300)
+                await asyncio.sleep(120)
                 try:
                     await msg.delete()
                 except:
