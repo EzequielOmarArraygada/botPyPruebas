@@ -107,6 +107,19 @@ CS-Bot/
    python main.py
    ```
 
+## Redeploy de Comandos
+
+Si necesitas actualizar los comandos del bot o después de hacer cambios en el código, usa el script de redeploy:
+
+```bash
+python redeploy.py
+```
+
+**⚠️ Importante**: 
+- Este script sincroniza los comandos slash y registra las views persistentes
+- Los botones del panel de tareas funcionarán correctamente después del redeploy
+- No uses el archivo `deploy_commands.py` (ya no existe), usa solo `redeploy.py`
+
 ## Configuración Requerida
 
 ### Discord Bot

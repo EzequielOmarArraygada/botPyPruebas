@@ -56,12 +56,15 @@ async def on_ready():
 
     # --- Sincronizar comandos de aplicación (slash) SOLO en el servidor configurado ---
     try:
-        guild = discord.Object(id=int(config.GUILD_ID))
-        synced = await bot.tree.sync(guild=guild)
-        print(f"Comandos sincronizados en guild: {config.GUILD_ID} ({len(synced)})")
-        print("Comandos disponibles en guild:")
-        for cmd in synced:
-            print(f"  - /{cmd.name}: {cmd.description}")
+        if not config.GUILD_ID:
+            print("Error: GUILD_ID no está configurado, no se pueden sincronizar comandos")
+        else:
+            guild = discord.Object(id=int(config.GUILD_ID))
+            synced = await bot.tree.sync(guild=guild)
+            print(f"Comandos sincronizados en guild: {config.GUILD_ID} ({len(synced)})")
+            print("Comandos disponibles en guild:")
+            for cmd in synced:
+                print(f"  - /{cmd.name}: {cmd.description}")
     except Exception as e:
         print(f"Error al sincronizar comandos: {e}")
 
@@ -132,6 +135,21 @@ async def load_extensions():
         except Exception as e:
             print(f"Error al cargar extension {extension}: {e}")
 
+async def register_persistent_views():
+    """Registrar views persistentes para botones que funcionen después de redeploy"""
+    try:
+        from tasks.panel import TaskPanelView, TaskSelectMenuView, TaskStartButtonView, TareaControlView
+        
+        # Registrar views del panel de tareas
+        bot.add_view(TaskPanelView())
+        bot.add_view(TaskSelectMenuView())
+        bot.add_view(TaskStartButtonView("placeholder"))
+        bot.add_view(TareaControlView())
+        
+        print("Views persistentes registradas correctamente")
+    except Exception as e:
+        print(f"Error al registrar views persistentes: {e}")
+
 async def main():
     print("Paso 1: Iniciando bot...")
     print(f"Paso 2: Token de Discord cargado (primeros 5 chars): {config.TOKEN[:5] if config.TOKEN else 'TOKEN NO CARGADO'}...")
@@ -142,6 +160,9 @@ async def main():
     
     # Cargar extensiones
     await load_extensions()
+    
+    # Registrar views persistentes
+    await register_persistent_views()
     
     # Conectar el bot
     try:
