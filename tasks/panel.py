@@ -204,11 +204,7 @@ class TaskStartButton(discord.ui.Button):
                 await msg_confirm.delete()
             except:
                 pass
-            # Eliminar el mensaje del botón inmediatamente (opcional, si quieres limpiar el panel)
-            try:
-                await interaction.message.delete()
-            except:
-                pass
+            # NO borrar el mensaje del panel de tareas
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
                 await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
