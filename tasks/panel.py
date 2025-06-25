@@ -201,7 +201,13 @@ class TaskStartButton(discord.ui.Button):
                 if canal_registro:
                     embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id, tarea_id)
-                    await canal_registro.send(embed=embed, view=view)
+                    msg_registro = await canal_registro.send(embed=embed, view=view)
+                    # Borrar el mensaje de registro después de 2 minutos
+                    await asyncio.sleep(120)
+                    try:
+                        await msg_registro.delete()
+                    except:
+                        pass
             
             # Eliminar el mensaje del botón después de 2 minutos
             await asyncio.sleep(120)
@@ -257,7 +263,13 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 if canal_registro:
                     embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id, tarea_id)
-                    await canal_registro.send(embed=embed, view=view)
+                    msg_registro = await canal_registro.send(embed=embed, view=view)
+                    # Borrar el mensaje de registro después de 2 minutos
+                    await asyncio.sleep(120)
+                    try:
+                        await msg_registro.delete()
+                    except:
+                        pass
             
             # Eliminar el mensaje del modal después de 20 segundos
             await asyncio.sleep(20)
@@ -569,7 +581,8 @@ class IniciarBuscarCasoButton(discord.ui.Button):
         if str(interaction.user.id) != str(self.user_id):
             await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
             return
-        await interaction.response.send_message('Usa el comando `/buscar-caso` en este canal para buscar un caso.', ephemeral=True)
+        from interactions.modals import BuscarCasoModal
+        await interaction.response.send_modal(BuscarCasoModal())
 
 class FacturaAButton(discord.ui.Button):
     def __init__(self):
@@ -642,7 +655,7 @@ class BuscarCasoButton(discord.ui.Button):
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                msg = await canal.send(f'🔍 {interaction.user.mention}, para buscar un caso, usa el comando `/buscar-caso` en este canal.')
+                msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para buscar un caso:', view=IniciarBuscarCasoView(interaction.user.id))
                 await asyncio.sleep(120)
                 try:
                     await msg.delete()

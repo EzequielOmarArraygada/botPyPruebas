@@ -304,6 +304,99 @@ def clean_html(raw_html):
     clean = re.compile('<.*?>')
     return re.sub(clean, '', raw_html)
 
+class BuscarCasoModal(discord.ui.Modal, title='Búsqueda de Caso'):
+    def __init__(self):
+        super().__init__(custom_id='buscarCasoModal')
+        self.pedido = discord.ui.TextInput(
+            label="Número de Pedido",
+            placeholder="Ingresa el número de pedido a buscar...",
+            custom_id="buscarCasoPedidoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        
+        # Agregar los componentes al modal
+        self.add_item(self.pedido)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        
+        try:
+            pedido = self.pedido.value.strip()
+            if not pedido or pedido.lower() == 'número de pedido':
+                await interaction.response.send_message('❌ Debes proporcionar un número de pedido válido para buscar.', ephemeral=True)
+                return
+            
+            # Verificar configuración
+            if not hasattr(config, 'SPREADSHEET_ID_BUSCAR_CASO') or not hasattr(config, 'SHEETS_TO_SEARCH') or not config.SHEETS_TO_SEARCH:
+                await interaction.response.send_message('❌ Error de configuración del bot: La búsqueda de casos no está configurada correctamente.', ephemeral=True)
+                return
+            
+            # Deferir la respuesta porque la búsqueda puede tomar tiempo
+            await interaction.response.defer(thinking=True)
+            
+            # Verificar credenciales
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.followup.send('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                return
+            if not config.SPREADSHEET_ID_BUSCAR_CASO:
+                await interaction.followup.send('❌ Error: El ID de la hoja de búsqueda no está configurado.', ephemeral=True)
+                return
+            
+            # Inicializar cliente de Google Sheets
+            from utils.google_sheets import initialize_google_sheets
+            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_BUSCAR_CASO)
+            found_rows = []
+            search_summary = f"Resultados de la búsqueda para el pedido **{pedido}**:\n\n"
+            
+            for sheet_name in config.SHEETS_TO_SEARCH:
+                try:
+                    sheet = spreadsheet.worksheet(sheet_name)
+                    rows = sheet.get('A:Z')
+                except Exception as sheet_error:
+                    search_summary += f"⚠️ Error al leer la pestaña \"{sheet_name}\".\n"
+                    continue
+                if not rows or len(rows) <= 1:
+                    continue
+                header_row = rows[0]
+                try:
+                    pedido_column_index = next(i for i, h in enumerate(header_row) if h and str(h).strip().lower() == 'número de pedido')
+                except StopIteration:
+                    search_summary += f"⚠️ No se encontró la columna \"Número de pedido\" en la pestaña \"{sheet_name}\".\n"
+                    continue
+                for i, row in enumerate(rows[1:], start=2):
+                    if len(row) <= pedido_column_index:
+                        continue
+                    row_pedido_value = str(row[pedido_column_index]).strip() if row[pedido_column_index] else ''
+                    if row_pedido_value.lower() == pedido.lower():
+                        found_rows.append({
+                            'sheet': sheet_name,
+                            'row_number': i,
+                            'data': row
+                        })
+            
+            if found_rows:
+                search_summary += f"✅ Se encontraron **{len(found_rows)}** coincidencias:\n\n"
+                detailed_results = ''
+                for found in found_rows:
+                    detailed_results += f"**Pestaña:** \"{found['sheet']}\", **Fila:** {found['row_number']}\n"
+                    display_columns = ' | '.join(found['data'][:6])
+                    detailed_results += f"`{display_columns}`\n\n"
+                full_message = search_summary + detailed_results
+                if len(full_message) > 2000:
+                    await interaction.followup.send(search_summary + "Los resultados completos son demasiado largos para mostrar aquí. Por favor, revisa la hoja de Google Sheets directamente.", ephemeral=False)
+                else:
+                    await interaction.followup.send(full_message, ephemeral=False)
+            else:
+                search_summary += '😕 No se encontraron coincidencias en las pestañas configuradas.'
+                await interaction.followup.send(search_summary, ephemeral=False)
+            
+        except Exception as error:
+            print('Error general durante la búsqueda de casos en Google Sheets:', error)
+            await interaction.followup.send('❌ Hubo un error al realizar la búsqueda de casos. Por favor, inténtalo de nuevo o contacta a un administrador.', ephemeral=False)
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
