@@ -163,26 +163,57 @@ class TaskStartButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        # Enviar mensaje de confirmación y guardarlo en una variable
-        msg_confirm = await interaction.channel.send(f'¡Tarea "{self.tarea}" iniciada y registrada!')
-        # Borrar el mensaje de confirmación después de 2 minutos
-        await asyncio.sleep(120)
+        # --- Google Sheets ---
+        client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+        spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+        sheet_activas = spreadsheet.worksheet('Tareas Activas')
+        sheet_historial = spreadsheet.worksheet('Historial')
+        usuario = str(interaction.user)
+        tarea = self.tarea
+        observaciones = ''
+        tz = pytz.timezone('America/Argentina/Buenos_Aires')
+        now = datetime.now(tz)
+        inicio = now.strftime('%d/%m/%Y %H:%M:%S')
         try:
-            await msg_confirm.delete()
-        except:
-            pass
-        # Enviar embed al canal de registro (sin borrado)
-        if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
-            canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
-            if canal_registro:
-                embed = crear_embed_tarea(interaction.user, self.tarea, '', '', 'En proceso', '00:00:00')
-                view = TareaControlView(user_id, None)
-                await canal_registro.send(embed=embed, view=view)
-        # Eliminar el mensaje del botón inmediatamente (opcional, si quieres limpiar el panel)
-        try:
-            await interaction.message.delete()
-        except:
-            pass
+            # Registrar tarea activa
+            tarea_id = google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
+            # Agregar evento al historial
+            google_sheets.agregar_evento_historial(
+                sheet_historial,
+                user_id,
+                tarea_id,
+                usuario,
+                tarea,
+                observaciones,
+                inicio,           # fecha_evento
+                'En proceso',     # estado
+                'Inicio',         # tipo_evento
+                ''                # tiempo_pausada
+            )
+            # Enviar embed al canal de registro (sin borrado)
+            if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
+                canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
+                if canal_registro:
+                    embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso', '00:00:00')
+                    view = TareaControlView(user_id, tarea_id)
+                    await canal_registro.send(embed=embed, view=view)
+            # Enviar mensaje de confirmación y borrarlo a los 2 minutos
+            msg_confirm = await interaction.channel.send(f'¡Tarea "{tarea}" iniciada y registrada!')
+            await asyncio.sleep(120)
+            try:
+                await msg_confirm.delete()
+            except:
+                pass
+            # Eliminar el mensaje del botón inmediatamente (opcional, si quieres limpiar el panel)
+            try:
+                await interaction.message.delete()
+            except:
+                pass
+        except Exception as e:
+            if "ya tiene una tarea activa" in str(e):
+                await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
+            else:
+                await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
 
 class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
     observaciones = discord.ui.TextInput(label='Observaciones (opcional)', required=False, style=discord.TextStyle.paragraph)
