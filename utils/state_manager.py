@@ -1,7 +1,5 @@
 import json
 from pathlib import Path
-import time
-import uuid
 
 # Define una ruta segura al archivo JSON
 temp_dir = Path.cwd() / 'temp'
@@ -49,34 +47,3 @@ def delete_user_state(user_id: str):
 
 def funcion_state_manager():
     pass
-
-# Genera un ID único para cada solicitud
-def generar_solicitud_id(user_id=None):
-    base = str(user_id) if user_id else ''
-    return f"{base}_{uuid.uuid4().hex[:8]}_{int(time.time())}"
-
-# Limpia estados con timestamp mayor a timeout segundos (por defecto 10 minutos)
-def cleanup_expired_states(timeout=600):
-    all_data = _read_pending_data()
-    now = time.time()
-    expired = []
-    for user_id, data in all_data.items():
-        ts = data.get('timestamp')
-        if ts:
-            try:
-                # Soporta timestamp como float o string ISO
-                if isinstance(ts, (int, float)):
-                    ts_val = float(ts)
-                else:
-                    try:
-                        ts_val = float(ts)
-                    except Exception:
-                        from datetime import datetime
-                        ts_val = datetime.fromisoformat(ts).timestamp()
-                if now - ts_val > timeout:
-                    expired.append(user_id)
-            except Exception:
-                continue
-    for user_id in expired:
-        del all_data[user_id]
-    _write_pending_data(all_data)

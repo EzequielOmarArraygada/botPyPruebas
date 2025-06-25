@@ -46,11 +46,8 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
     async def on_submit(self, interaction: discord.Interaction):
         import config
         import utils.state_manager as state_manager
-        from utils.state_manager import generar_solicitud_id, cleanup_expired_states
-        cleanup_expired_states()
         try:
             user_id = str(interaction.user.id)
-            solicitud_id = generar_solicitud_id(user_id)
             pedido = self.pedido.value.strip()
             caso = self.caso.value.strip()
             email = self.email.value.strip()
@@ -97,7 +94,7 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             sheet.append_row(row_data)
             parent_folder_id = getattr(config, 'PARENT_DRIVE_FOLDER_ID', None)
             if parent_folder_id:
-                state_manager.set_user_state(user_id, {"type": "facturaA", "pedido": pedido, "solicitud_id": solicitud_id, "timestamp": now.timestamp()})
+                state_manager.set_user_state(user_id, {"type": "facturaA", "pedido": pedido, "timestamp": now.isoformat()})
             confirmation_message = '✅ **Solicitud de Factura A cargada correctamente en Google Sheets.**'
             if parent_folder_id:
                 confirmation_message += '\n\n📎 **Próximo paso:** Envía los archivos adjuntos para esta solicitud en un **mensaje separado** aquí mismo en este canal.'
@@ -143,8 +140,6 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
     async def on_submit(self, interaction: discord.Interaction):
         import config
         import utils.state_manager as state_manager
-        from utils.state_manager import generar_solicitud_id, cleanup_expired_states
-        cleanup_expired_states()
         try:
             user_id = str(interaction.user.id)
             pending_data = state_manager.get_user_state(user_id)
@@ -157,7 +152,6 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             numero_caso = self.numero_caso.value.strip()
             datos_contacto = self.datos_contacto.value.strip()
             tipo_solicitud = pending_data.get('tipoSolicitud', 'OTROS')
-            solicitud_id = pending_data.get('solicitud_id') or generar_solicitud_id(user_id)
             # Validar datos requeridos
             if not pedido or not numero_caso or not datos_contacto:
                 await interaction.response.send_message('❌ Error: Todos los campos son requeridos.', ephemeral=True)

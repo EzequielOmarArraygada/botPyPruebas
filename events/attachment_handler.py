@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from utils.state_manager import get_user_state, delete_user_state, cleanup_expired_states
+from utils.state_manager import get_user_state, delete_user_state
 from utils.google_drive import initialize_google_drive, find_or_create_drive_folder, upload_file_to_drive
 import config
 
@@ -24,13 +24,11 @@ class AttachmentHandler(commands.Cog):
             return
         
         user_id = str(message.author.id)
-        cleanup_expired_states()
         pending_data = get_user_state(user_id)
         
         # Solo manejar si el usuario está esperando adjuntos para Factura A
         if pending_data and pending_data.get('type') == 'facturaA' and message.attachments:
             pedido = pending_data.get('pedido')
-            solicitud_id = pending_data.get('solicitud_id')
             if not pedido:
                 await message.reply('❌ Error: No se encontró el número de pedido')
                 delete_user_state(user_id)
@@ -44,10 +42,7 @@ class AttachmentHandler(commands.Cog):
                 parent_folder_id = getattr(config, 'PARENT_DRIVE_FOLDER_ID', None)
                 if not parent_folder_id:
                     print("Advertencia: PARENT_DRIVE_FOLDER_ID no está configurado, creando carpeta en raíz")
-                folder_name = f'FacturaA_{pedido}'
-                if solicitud_id:
-                    folder_name += f'_{solicitud_id}'
-                folder_id = find_or_create_drive_folder(drive_service, parent_folder_id or "", folder_name)
+                folder_id = find_or_create_drive_folder(drive_service, parent_folder_id or "", f'FacturaA_{pedido}')
                 
                 # Subir cada adjunto
                 uploaded_files = []
