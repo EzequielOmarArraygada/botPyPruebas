@@ -7,12 +7,39 @@ from interactions.modals import FacturaAModal
 import re
 from datetime import datetime
 
+def get_guild_object():
+    try:
+        return discord.Object(id=int(getattr(config, 'GUILD_ID', 0) or 0))
+    except Exception:
+        return None
+
+def get_target_category_id():
+    try:
+        return int(getattr(config, 'TARGET_CATEGORY_ID', 0) or 0)
+    except Exception:
+        return None
+
+def maybe_guild_decorator():
+    try:
+        gid = int(getattr(config, 'GUILD_ID', 0) or 0)
+        if gid:
+            return app_commands.guilds(discord.Object(id=gid))
+    except Exception:
+        pass
+    return lambda x: x
+
 class InteractionCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @maybe_guild_decorator()
     @app_commands.command(name="factura-a", description="Solicita el registro de Factura A")
     async def factura_a(self, interaction: discord.Interaction):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
         # Restricción de canal
         if hasattr(config, 'TARGET_CHANNEL_ID_FAC_A') and str(interaction.channel_id) != str(config.TARGET_CHANNEL_ID_FAC_A):
             await interaction.response.send_message(
@@ -27,30 +54,31 @@ class InteractionCommands(commands.Cog):
             await interaction.response.send_message(
                 'Hubo un error al abrir el formulario de solicitud de Factura A. Por favor, inténtalo de nuevo.', ephemeral=True)
 
+    @maybe_guild_decorator()
     @app_commands.command(name="tracking", description="Consulta el estado de un envío de Andreani")
     @app_commands.describe(numero="Número de seguimiento de Andreani")
     async def tracking(self, interaction: discord.Interaction, numero: str):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
         # Restricción de canal
         if hasattr(config, 'TARGET_CHANNEL_ID_ENVIOS') and str(interaction.channel_id) != str(config.TARGET_CHANNEL_ID_ENVIOS):
             await interaction.response.send_message(
                 f"Este comando solo puede ser usado en el canal <#{config.TARGET_CHANNEL_ID_ENVIOS}>.", ephemeral=True)
             return
-        
         await interaction.response.defer(thinking=True)
-        
         tracking_number = numero.strip()
         if not tracking_number:
             await interaction.followup.send('❌ Debes proporcionar un número de seguimiento.', ephemeral=True)
             return
-            
         # Verificar que el auth header esté configurado
         if not config.ANDREANI_AUTH_HEADER:
             await interaction.followup.send('❌ Error: La API de Andreani no está configurada correctamente.', ephemeral=True)
             return
-            
         try:
             tracking_data = get_andreani_tracking(tracking_number, config.ANDREANI_AUTH_HEADER)
-            
             if tracking_data:
                 info = tracking_data
                 # Estado actual y fecha
@@ -80,18 +108,22 @@ class InteractionCommands(commands.Cog):
                     tracking_info += "Historial: No disponible\n"
             else:
                 tracking_info = f"😕 No se pudo encontrar la información de tracking para **{tracking_number}**."
-                
         except ValueError as ve:
             print('Error de validación en tracking de Andreani:', ve)
             tracking_info = f"❌ Error de configuración: {ve}"
         except Exception as error:
             print('Error al consultar la API de tracking de Andreani:', error)
             tracking_info = f"❌ Hubo un error al consultar el estado del tracking para **{tracking_number}**. Detalles: {error}"
-            
         await interaction.followup.send(tracking_info, ephemeral=False)
 
+    @maybe_guild_decorator()
     @app_commands.command(name="agregar-caso", description="Inicia el registro de un nuevo caso")
     async def agregar_caso(self, interaction: discord.Interaction):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
         # Restricción de canal
         if hasattr(config, 'TARGET_CHANNEL_ID_CASOS') and str(interaction.channel_id) != str(config.TARGET_CHANNEL_ID_CASOS):
             await interaction.response.send_message(
@@ -114,9 +146,15 @@ class InteractionCommands(commands.Cog):
                 'Hubo un error al iniciar el formulario de registro de caso. Por favor, inténtalo de nuevo.', ephemeral=True)
             delete_user_state(str(interaction.user.id))
 
+    @maybe_guild_decorator()
     @app_commands.command(name="buscar-caso", description="Busca un caso por número de pedido en las hojas configuradas")
     @app_commands.describe(pedido="Número de pedido a buscar")
     async def buscar_caso(self, interaction: discord.Interaction, pedido: str):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
         # Restricción de canal
         if hasattr(config, 'TARGET_CHANNEL_ID_BUSCAR_CASO') and str(interaction.channel_id) != str(config.TARGET_CHANNEL_ID_BUSCAR_CASO):
             await interaction.response.send_message(
@@ -138,7 +176,6 @@ class InteractionCommands(commands.Cog):
             if not config.SPREADSHEET_ID_BUSCAR_CASO:
                 await interaction.followup.send('❌ Error: El ID de la hoja de búsqueda no está configurado.', ephemeral=True)
                 return
-                
             # Inicializar cliente de Google Sheets
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_BUSCAR_CASO)
@@ -221,7 +258,8 @@ class InteractionCommands(commands.Cog):
     #         print("Error al procesar el comando /manual:", error)
     #         await interaction.followup.send(f'❌ Hubo un error al procesar tu pregunta. Inténtalo de nuevo más tarde. (Detalles: {error})', ephemeral=True)
 
-    @app_commands.command(name="testping", description="Verifica si el bot está activo")
+    @maybe_guild_decorator()
+    @app_commands.command(name="testping", description="Verifica si el bot está activo.")
     @app_commands.dm_only()
     async def ping(self, interaction: discord.Interaction):
         print("El bot está activo")

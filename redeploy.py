@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
-"""
-Script para hacer redeploy de comandos del bot de Discord.
-Este script sincroniza los comandos slash y registra las views persistentes.
-"""
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+valor_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+if valor_json is None:
+    print("[DEBUG] GOOGLE_CREDENTIALS_JSON: None (no se está leyendo la variable de entorno)")
+else:
+    print("[DEBUG] GOOGLE_CREDENTIALS_JSON (primeros 200 chars):", valor_json[:200])
 
 import os
 import sys
@@ -14,6 +18,12 @@ import config
 # Configuración del bot temporal para redeploy
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+valor_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+if valor_json is None:
+    print("[DEBUG] GOOGLE_CREDENTIALS_JSON: None (no se está leyendo la variable de entorno)")
+else:
+    print("[DEBUG] GOOGLE_CREDENTIALS_JSON (primeros 200 chars):", valor_json[:200])
 
 @bot.event
 async def on_ready():
