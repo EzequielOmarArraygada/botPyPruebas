@@ -104,15 +104,13 @@ class TaskRegisterButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        await interaction.response.send_message(
+        msg_select = await interaction.channel.send(
             'Selecciona la tarea que vas a realizar:',
-            view=TaskSelectMenuView(),
-            ephemeral=False
+            view=TaskSelectMenuView()
         )
-        # Borrar el mensaje después de 2 minutos
         await asyncio.sleep(120)
         try:
-            await interaction.message.delete()
+            await msg_select.delete()
         except:
             pass
 
@@ -134,15 +132,13 @@ class TaskSelectMenu(discord.ui.Select):
         if seleccion == 'Otra':
             await interaction.response.send_modal(TaskObservacionesModal())
         else:
-            await interaction.response.send_message(
+            msg_tarea = await interaction.channel.send(
                 f'Tarea seleccionada: **{seleccion}**\nPresiona "Comenzar" para iniciar.',
-                view=TaskStartButtonView(seleccion),
-                ephemeral=False
+                view=TaskStartButtonView(seleccion)
             )
-            # Eliminar el mensaje del menú después de 2 minutos
             await asyncio.sleep(120)
             try:
-                await interaction.message.delete()
+                await msg_tarea.delete()
             except:
                 pass
 
@@ -204,7 +200,6 @@ class TaskStartButton(discord.ui.Button):
                 await msg_confirm.delete()
             except:
                 pass
-            # NO borrar el mensaje del panel de tareas
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
                 await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
