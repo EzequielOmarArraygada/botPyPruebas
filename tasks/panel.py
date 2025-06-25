@@ -484,6 +484,12 @@ class PanelComandosView(discord.ui.View):
         self.add_item(TrackingButton())
         self.add_item(BuscarCasoButton())
 
+def safe_int(val):
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
 class FacturaAButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Factura A', emoji='🧾', style=discord.ButtonStyle.success, custom_id='panel_factura_a')
@@ -492,10 +498,11 @@ class FacturaAButton(discord.ui.Button):
         await interaction.response.send_modal(FacturaAModal())
         # Opcional: notificar en el canal correspondiente
         from config import TARGET_CHANNEL_ID_FAC_A
-        canal_id = int(TARGET_CHANNEL_ID_FAC_A)
-        canal = interaction.guild.get_channel(canal_id)
-        if canal:
-            await canal.send(f'{interaction.user.mention} inició una solicitud de Factura A (modal abierto).')
+        canal_id = safe_int(TARGET_CHANNEL_ID_FAC_A)
+        if canal_id:
+            canal = interaction.guild.get_channel(canal_id)
+            if canal:
+                await canal.send(f'{interaction.user.mention} inició una solicitud de Factura A (modal abierto).')
 
 class AgregarCasoButton(discord.ui.Button):
     def __init__(self):
@@ -506,10 +513,11 @@ class AgregarCasoButton(discord.ui.Button):
         await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
         # Opcional: notificar en el canal correspondiente
         from config import TARGET_CHANNEL_ID_CASOS
-        canal_id = int(TARGET_CHANNEL_ID_CASOS)
-        canal = interaction.guild.get_channel(canal_id)
-        if canal:
-            await canal.send(f'{interaction.user.mention} inició una solicitud de caso (select enviado por modal).')
+        canal_id = safe_int(TARGET_CHANNEL_ID_CASOS)
+        if canal_id:
+            canal = interaction.guild.get_channel(canal_id)
+            if canal:
+                await canal.send(f'{interaction.user.mention} inició una solicitud de caso (select enviado por modal).')
 
 class TrackingButton(discord.ui.Button):
     def __init__(self):
@@ -517,10 +525,11 @@ class TrackingButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.send_message('Para consulta de tracking, usa el comando /tracking en el canal correspondiente.', ephemeral=True)
         from config import TARGET_CHANNEL_ID_ENVIOS
-        canal_id = int(TARGET_CHANNEL_ID_ENVIOS)
-        canal = interaction.guild.get_channel(canal_id)
-        if canal:
-            await canal.send(f'{interaction.user.mention} para consulta de tracking. Usa el comando /tracking en este canal.')
+        canal_id = safe_int(TARGET_CHANNEL_ID_ENVIOS)
+        if canal_id:
+            canal = interaction.guild.get_channel(canal_id)
+            if canal:
+                await canal.send(f'{interaction.user.mention} para consulta de tracking. Usa el comando /tracking en este canal.')
 
 class BuscarCasoButton(discord.ui.Button):
     def __init__(self):
@@ -528,10 +537,11 @@ class BuscarCasoButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.send_message('Para búsqueda de caso, usa el comando /buscar-caso en el canal correspondiente.', ephemeral=True)
         from config import TARGET_CHANNEL_ID_BUSCAR_CASO
-        canal_id = int(TARGET_CHANNEL_ID_BUSCAR_CASO)
-        canal = interaction.guild.get_channel(canal_id)
-        if canal:
-            await canal.send(f'{interaction.user.mention} para búsqueda de caso. Usa el comando /buscar-caso en este canal.')
+        canal_id = safe_int(TARGET_CHANNEL_ID_BUSCAR_CASO)
+        if canal_id:
+            canal = interaction.guild.get_channel(canal_id)
+            if canal:
+                await canal.send(f'{interaction.user.mention} para búsqueda de caso. Usa el comando /buscar-caso en este canal.')
 
 class PanelComandos(commands.Cog):
     def __init__(self, bot):
