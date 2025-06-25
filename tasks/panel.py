@@ -474,4 +474,97 @@ async def setup(bot):
     # Registrar las views persistentes para los botones de tareas
     # Nota: TareaControlView se registra automáticamente cuando se crea con custom_id
     await bot.add_cog(TaskPanel(bot))
-    print('[DEBUG] TaskPanel Cog agregado al bot') 
+    print('[DEBUG] TaskPanel Cog agregado al bot')
+
+class PanelComandosView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(FacturaAButton())
+        self.add_item(AgregarCasoButton())
+        self.add_item(TrackingButton())
+        self.add_item(BuscarCasoButton())
+
+class FacturaAButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Factura A', emoji='🧾', style=discord.ButtonStyle.success, custom_id='panel_factura_a')
+    async def callback(self, interaction: discord.Interaction):
+        from config import TARGET_CHANNEL_ID_FAC_A
+        canal_id = int(TARGET_CHANNEL_ID_FAC_A)
+        canal = interaction.guild.get_channel(canal_id)
+        if canal:
+            await canal.send(f'{interaction.user.mention} inició una solicitud de Factura A:')
+            from interactions.modals import FacturaAModal
+            try:
+                await canal.send_modal(FacturaAModal())
+            except Exception as e:
+                await canal.send(f'Error al mostrar el modal: {e}')
+        await interaction.response.defer()  # No responder en el canal del panel
+
+class AgregarCasoButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Agregar caso', emoji='📝', style=discord.ButtonStyle.success, custom_id='panel_agregar_caso')
+    async def callback(self, interaction: discord.Interaction):
+        from config import TARGET_CHANNEL_ID_CASOS
+        canal_id = int(TARGET_CHANNEL_ID_CASOS)
+        canal = interaction.guild.get_channel(canal_id)
+        if canal:
+            await canal.send(f'{interaction.user.mention} inició una solicitud de caso:')
+            # Simular el flujo de agregar caso (puedes mejorar esto para llamar el flujo real)
+            from interactions.select_menus import build_tipo_solicitud_select_menu
+            view = build_tipo_solicitud_select_menu()
+            await canal.send('Por favor, selecciona el tipo de solicitud:', view=view)
+        await interaction.response.defer()
+
+class TrackingButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Tracking', emoji='📦', style=discord.ButtonStyle.secondary, custom_id='panel_tracking')
+    async def callback(self, interaction: discord.Interaction):
+        from config import TARGET_CHANNEL_ID_ENVIOS
+        canal_id = int(TARGET_CHANNEL_ID_ENVIOS)
+        canal = interaction.guild.get_channel(canal_id)
+        if canal:
+            await canal.send(f'{interaction.user.mention} para consulta de tracking. Usa el comando /tracking en este canal.')
+        await interaction.response.defer()
+
+class BuscarCasoButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Buscar caso', emoji='🔍', style=discord.ButtonStyle.secondary, custom_id='panel_buscar_caso')
+    async def callback(self, interaction: discord.Interaction):
+        from config import TARGET_CHANNEL_ID_BUSCAR_CASO
+        canal_id = int(TARGET_CHANNEL_ID_BUSCAR_CASO)
+        canal = interaction.guild.get_channel(canal_id)
+        if canal:
+            await canal.send(f'{interaction.user.mention} para búsqueda de caso. Usa el comando /buscar-caso en este canal.')
+        await interaction.response.defer()
+
+class PanelComandos(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.guilds(discord.Object(id=int(config.GUILD_ID)))
+    @app_commands.command(name='setup_panel_comandos', description='Publica el panel de comandos en el canal de guía (solo admins)')
+    async def setup_panel_comandos(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message('No tienes permisos para usar este comando.', ephemeral=True)
+            return
+        # Canal de guía
+        canal_id = getattr(config, 'TARGET_CHANNEL_ID_GUIA_COMANDOS', None)
+        if canal_id:
+            canal = interaction.guild.get_channel(int(canal_id))
+        else:
+            canal = discord.utils.get(interaction.guild.text_channels, name='guia-comandos-bot')
+        if not canal:
+            await interaction.response.send_message('No se encontró el canal de guía de comandos.', ephemeral=True)
+            return
+        embed = discord.Embed(
+            title='Panel de Comandos del Bot',
+            description='Selecciona una acción para comenzar. Las solicitudes se procesarán en el canal correspondiente.',
+            color=discord.Color.blurple()
+        )
+        view = PanelComandosView()
+        await canal.send(embed=embed, view=view)
+        await interaction.response.send_message('Panel de comandos publicado correctamente.', ephemeral=True)
+
+async def setup(bot):
+    await bot.add_cog(PanelComandos(bot))
+    # ... resto del setup ... 
