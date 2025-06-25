@@ -139,12 +139,16 @@ async def register_persistent_views():
     """Registrar views persistentes para botones que funcionen después de redeploy"""
     try:
         from tasks.panel import TaskPanelView, TaskSelectMenuView, TaskStartButtonView, TareaControlView
+        from events.attachment_handler import SolicitudCargadaView
         
         # Registrar views del panel de tareas
         bot.add_view(TaskPanelView())
         bot.add_view(TaskSelectMenuView())
         bot.add_view(TaskStartButtonView("placeholder"))
         bot.add_view(TareaControlView())
+        
+        # Registrar view para solicitudes de Factura A
+        bot.add_view(SolicitudCargadaView("placeholder", "placeholder", "placeholder", "placeholder", "placeholder"))
         
         print("Views persistentes registradas correctamente")
     except Exception as e:
