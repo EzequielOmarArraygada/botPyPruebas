@@ -397,6 +397,104 @@ class BuscarCasoModal(discord.ui.Modal, title='Búsqueda de Caso'):
             print('Error general durante la búsqueda de casos en Google Sheets:', error)
             await interaction.followup.send('❌ Hubo un error al realizar la búsqueda de casos. Por favor, inténtalo de nuevo o contacta a un administrador.', ephemeral=False)
 
+class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
+    def __init__(self, tarea_id, user_id):
+        super().__init__(custom_id='cantidadCasosModal')
+        self.tarea_id = tarea_id
+        self.user_id = user_id
+        
+        self.cantidad_casos = discord.ui.TextInput(
+            label="Cantidad de casos gestionados",
+            placeholder="Ingresa el número de casos gestionados...",
+            custom_id="cantidadCasosInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=10
+        )
+        
+        # Agregar los componentes al modal
+        self.add_item(self.cantidad_casos)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        import utils.google_sheets as google_sheets
+        from datetime import datetime
+        import pytz
+        
+        try:
+            # Validar que el usuario sea el correcto
+            if str(interaction.user.id) != self.user_id:
+                await interaction.response.send_message('❌ Solo puedes finalizar tus propias tareas.', ephemeral=True)
+                return
+            
+            # Validar y convertir la cantidad de casos
+            cantidad_str = self.cantidad_casos.value.strip()
+            try:
+                cantidad = int(cantidad_str)
+                if cantidad <= 0:
+                    await interaction.response.send_message('❌ La cantidad de casos debe ser un número entero positivo mayor a cero.', ephemeral=True)
+                    return
+            except ValueError:
+                await interaction.response.send_message('❌ La cantidad de casos debe ser un número entero válido.', ephemeral=True)
+                return
+            
+            # Verificar credenciales
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                return
+            if not config.GOOGLE_SHEET_ID_TAREAS:
+                await interaction.response.send_message('❌ Error: El ID de la hoja de tareas no está configurado.', ephemeral=True)
+                return
+            
+            # Inicializar Google Sheets
+            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            sheet_activas = spreadsheet.worksheet('Tareas Activas')
+            sheet_historial = spreadsheet.worksheet('Historial')
+            
+            # Obtener datos actuales de la tarea
+            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+            if not datos_tarea:
+                await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
+                return
+            
+            # Obtener fecha actual
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
+            
+            # Finalizar la tarea con la cantidad de casos
+            google_sheets.finalizar_tarea_por_id_con_cantidad(
+                sheet_activas, 
+                sheet_historial, 
+                self.tarea_id, 
+                str(interaction.user), 
+                fecha_actual, 
+                cantidad
+            )
+            
+            # Actualizar el embed con estado finalizado y cantidad de casos
+            from tasks.panel import crear_embed_tarea
+            embed = crear_embed_tarea(
+                interaction.user, 
+                datos_tarea['tarea'], 
+                datos_tarea['observaciones'], 
+                datos_tarea['inicio'], 
+                'Finalizada', 
+                datos_tarea['tiempo_pausado'],
+                cantidad_casos=cantidad
+            )
+            embed.color = discord.Color.red()
+            
+            # Crear una nueva vista sin botones para tareas finalizadas
+            view = discord.ui.View(timeout=None)
+            
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            print(f'Error al finalizar tarea con cantidad de casos: {e}')
+            await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

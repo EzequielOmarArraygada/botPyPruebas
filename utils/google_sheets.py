@@ -503,6 +503,69 @@ def finalizar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, usuario, fe
         print(f'[ERROR] finalizar_tarea_por_id: {e}')
         raise
 
+def finalizar_tarea_por_id_con_cantidad(sheet_activas, sheet_historial, tarea_id, usuario, fecha_finalizacion, cantidad_casos):
+    """
+    Finaliza una tarea específica por su ID, actualiza la cantidad de casos en ambas hojas
+    y registra el evento en el historial.
+    """
+    try:
+        # Obtener datos de la tarea por ID
+        datos_tarea = obtener_tarea_por_id(sheet_activas, tarea_id)
+        if not datos_tarea:
+            raise Exception('No se encontró la tarea especificada.')
+        
+        if datos_tarea['estado'].lower() in ['en proceso', 'pausada']:
+            # Actualizar estado a finalizada y agregar fecha de finalización
+            header_activas = sheet_activas.get_all_values()[0]
+            estado_col = get_col_index(header_activas, 'Estado (En proceso, Pausada)')
+            finalizacion_col = get_col_index(header_activas, 'Fecha/hora de finalización')
+            cantidad_col = get_col_index(header_activas, 'Cantidad de casos')
+            
+            if estado_col is not None:
+                sheet_activas.update_cell(datos_tarea['fila_idx'], estado_col + 1, 'Finalizada')
+            if finalizacion_col is not None:
+                sheet_activas.update_cell(datos_tarea['fila_idx'], finalizacion_col + 1, fecha_finalizacion)
+            
+            # Actualizar cantidad de casos en Tareas Activas
+            if cantidad_col is not None:
+                sheet_activas.update_cell(datos_tarea['fila_idx'], cantidad_col + 1, cantidad_casos)
+            
+            # Buscar y actualizar la cantidad de casos en el historial
+            # Buscar la fila correspondiente a esta tarea en el historial
+            rows_historial = sheet_historial.get_all_values()
+            header_historial = rows_historial[0]
+            tarea_id_col_hist = get_col_index(header_historial, 'Tarea ID')
+            cantidad_col_hist = get_col_index(header_historial, 'Cantidad de casos')
+            
+            if tarea_id_col_hist is not None:
+                for i, row in enumerate(rows_historial[1:], start=2):
+                    if len(row) > tarea_id_col_hist and row[tarea_id_col_hist] == tarea_id:
+                        # Actualizar cantidad de casos en esta fila del historial
+                        if cantidad_col_hist is not None:
+                            sheet_historial.update_cell(i, cantidad_col_hist + 1, cantidad_casos)
+                        break
+            
+            # Registrar evento en historial
+            agregar_evento_historial(
+                sheet_historial,
+                datos_tarea.get('user_id', ''),  # Necesitamos el user_id
+                tarea_id,
+                usuario,
+                datos_tarea['tarea'],
+                datos_tarea['observaciones'],
+                fecha_finalizacion,  # Fecha del evento
+                'Finalizada',
+                'Finalización',
+                datos_tarea['tiempo_pausado']
+            )
+            return True
+        else:
+            raise Exception('La tarea no está activa.')
+        
+    except Exception as e:
+        print(f'[ERROR] finalizar_tarea_por_id_con_cantidad: {e}')
+        raise
+
 def obtener_tarea_por_id(sheet, tarea_id):
     """
     Obtiene los datos de una tarea específica por su ID.

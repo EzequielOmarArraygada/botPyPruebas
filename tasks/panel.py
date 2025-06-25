@@ -250,7 +250,7 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
             else:
                 await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
 
-def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado='00:00:00'):
+def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado='00:00:00', cantidad_casos=None):
     """
     Crea un embed visualmente atractivo para mostrar los datos de una tarea.
     """
@@ -306,6 +306,14 @@ def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado
         embed.add_field(
             name='⏸️ Tiempo Pausado',
             value=tiempo_pausado,
+            inline=True
+        )
+    
+    # Agregar cantidad de casos si está disponible y la tarea está finalizada
+    if cantidad_casos is not None and estado.lower() == 'finalizada':
+        embed.add_field(
+            name='📊 Casos Gestionados',
+            value=f'{cantidad_casos} casos',
             inline=True
         )
     
@@ -422,38 +430,10 @@ class FinalizarButton(discord.ui.Button):
             return
         
         try:
-            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
-            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
-            sheet_activas = spreadsheet.worksheet('Tareas Activas')
-            sheet_historial = spreadsheet.worksheet('Historial')
-            
-            # Obtener datos actuales de la tarea por ID
-            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
-            if not datos_tarea:
-                await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
-                return
-            
-            tz = pytz.timezone('America/Argentina/Buenos_Aires')
-            now = datetime.now(tz)
-            fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
-            
-            # Finalizar la tarea
-            google_sheets.finalizar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
-            
-            # Actualizar el embed con estado finalizado
-            embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Finalizada', datos_tarea['tiempo_pausado'])
-            embed.color = discord.Color.red()
-            
-            # Crear una nueva vista sin botones para tareas finalizadas
-            view = discord.ui.View(timeout=None)
-            
-            await interaction.response.edit_message(embed=embed, view=view)
-            msg = await interaction.followup.send('✅ Tarea finalizada correctamente.')
-            await asyncio.sleep(20)
-            try:
-                await msg.delete()
-            except:
-                pass
+            # Mostrar el modal para solicitar la cantidad de casos
+            from interactions.modals import CantidadCasosModal
+            modal = CantidadCasosModal(self.tarea_id, self.user_id)
+            await interaction.response.send_modal(modal)
             
         except Exception as e:
             await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
