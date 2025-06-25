@@ -45,8 +45,6 @@ class AttachmentHandler(commands.Cog):
                 if not parent_folder_id:
                     print("Advertencia: PARENT_DRIVE_FOLDER_ID no está configurado, creando carpeta en raíz")
                 folder_name = f'FacturaA_{pedido}'
-                if solicitud_id:
-                    folder_name += f'_{solicitud_id}'
                 folder_id = find_or_create_drive_folder(drive_service, parent_folder_id or "", folder_name)
                 
                 # Subir cada adjunto

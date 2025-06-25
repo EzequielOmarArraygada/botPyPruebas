@@ -35,15 +35,15 @@ class InteractionSelects(commands.Cog):
             
             print('DEBUG: Interacción recibida del select menu')
             try:
-            user_id = str(interaction.user.id)
+                user_id = str(interaction.user.id)
                 pending_data = state_manager.get_user_state(user_id)
                 print(f'DEBUG: Estado pendiente para usuario {user_id}: {pending_data}')
-            if pending_data and pending_data.get('type') == 'caso' and pending_data.get('paso') == 1:
-                try:
-                    select_data = interaction.data
+                if pending_data and pending_data.get('type') == 'caso' and pending_data.get('paso') == 1:
+                    try:
+                        select_data = interaction.data
                         print(f'DEBUG: Datos del select: {select_data}')
-                    if 'values' in select_data and select_data['values']:
-                        selected_tipo = select_data['values'][0]
+                        if 'values' in select_data and select_data['values']:
+                            selected_tipo = select_data['values'][0]
                             print(f"DEBUG: Tipo seleccionado: {selected_tipo}")
                             solicitud_id = generar_solicitud_id(user_id)
                             now = time.time()
@@ -68,21 +68,21 @@ class InteractionSelects(commands.Cog):
                                 print('DEBUG: Mensaje con botón enviado correctamente.')
                             except Exception as e:
                                 print(f'ERROR al crear la View o enviar el mensaje con el botón: {e}')
-                        return
-                    else:
-                        raise ValueError("No se encontraron valores en la selección")
-                except (KeyError, IndexError, ValueError) as e:
-                    print(f"Error al procesar selección de tipo de solicitud: {e}")
+                            return
+                        else:
+                            raise ValueError("No se encontraron valores en la selección")
+                    except (KeyError, IndexError, ValueError) as e:
+                        print(f"Error al procesar selección de tipo de solicitud: {e}")
+                        await interaction.response.edit_message(
+                            content='Error al procesar la selección. Por favor, intenta de nuevo.',
+                            view=None
+                        )
+                        state_manager.delete_user_state(user_id)
+                else:
                     await interaction.response.edit_message(
-                        content='Error al procesar la selección. Por favor, intenta de nuevo.',
+                        content='Esta selección no corresponde a un proceso activo. Por favor, usa el comando /agregar-caso para empezar.',
                         view=None
                     )
-                        state_manager.delete_user_state(user_id)
-            else:
-                await interaction.response.edit_message(
-                    content='Esta selección no corresponde a un proceso activo. Por favor, usa el comando /agregar-caso para empezar.',
-                    view=None
-                )
                     state_manager.delete_user_state(user_id)
             except Exception as e:
                 print(f'ERROR GLOBAL en el bloque del select menu: {e}')
