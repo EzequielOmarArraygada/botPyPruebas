@@ -224,6 +224,55 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu caso. Detalles: {error}', ephemeral=True)
             state_manager.delete_user_state(str(interaction.user.id))
 
+class TrackingModal(discord.ui.Modal, title='Consulta de Tracking'):
+    def __init__(self):
+        super().__init__(custom_id='trackingModal')
+        self.numero = discord.ui.TextInput(
+            label="Número de Seguimiento",
+            placeholder="Ingresa el número de seguimiento de Andreani...",
+            custom_id="trackingNumeroInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        
+        # Agregar los componentes al modal
+        self.add_item(self.numero)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        from utils.andreani import get_andreani_tracking
+        
+        try:
+            tracking_number = self.numero.value.strip()
+            if not tracking_number:
+                await interaction.response.send_message('❌ Debes proporcionar un número de seguimiento válido.', ephemeral=True)
+                return
+            
+            # Verificar configuración
+            if not config.ANDREANI_AUTH_HEADER:
+                await interaction.response.send_message('❌ Error: La configuración de Andreani no está disponible.', ephemeral=True)
+                return
+            
+            # Deferir la respuesta porque la consulta puede tomar tiempo
+            await interaction.response.defer(thinking=True)
+            
+            # Consultar tracking (función síncrona)
+            tracking_data = get_andreani_tracking(tracking_number, config.ANDREANI_AUTH_HEADER)
+            
+            # Formatear respuesta
+            if tracking_data and 'estado' in tracking_data:
+                estado = tracking_data['estado']
+                tracking_info = f"📦 **Estado del envío {tracking_number}:**\n\n{estado}"
+            else:
+                tracking_info = f"❌ No se encontró información para el número de seguimiento **{tracking_number}**."
+            
+            # Enviar resultado
+            await interaction.followup.send(tracking_info, ephemeral=False)
+            
+        except Exception as error:
+            await interaction.followup.send(f'❌ Hubo un error al consultar el tracking. Detalles: {error}', ephemeral=True)
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

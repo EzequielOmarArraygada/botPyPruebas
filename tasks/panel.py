@@ -107,8 +107,14 @@ class TaskRegisterButton(discord.ui.Button):
         await interaction.response.send_message(
             'Selecciona la tarea que vas a realizar:',
             view=TaskSelectMenuView(),
-            ephemeral=True
+            ephemeral=False
         )
+        # Borrar el mensaje después de 2 minutos
+        await asyncio.sleep(120)
+        try:
+            await interaction.message.delete()
+        except:
+            pass
 
 class TaskSelectMenu(discord.ui.Select):
     def __init__(self):
@@ -131,10 +137,10 @@ class TaskSelectMenu(discord.ui.Select):
             await interaction.response.send_message(
                 f'Tarea seleccionada: **{seleccion}**\nPresiona "Comenzar" para iniciar.',
                 view=TaskStartButtonView(seleccion),
-                ephemeral=True
+                ephemeral=False
             )
-            # Eliminar el mensaje del menú después de 20 segundos
-            await asyncio.sleep(20)
+            # Eliminar el mensaje del menú después de 2 minutos
+            await asyncio.sleep(120)
             try:
                 await interaction.message.delete()
             except:
@@ -186,8 +192,8 @@ class TaskStartButton(discord.ui.Button):
                 ''                # tiempo_pausada
             )
             
-            # Enviar confirmación efímera al usuario
-            await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=True)
+            # Enviar confirmación al usuario
+            await interaction.response.send_message(f'¡Tarea "{tarea}" iniciada y registrada!', ephemeral=False)
             
             # Enviar embed al canal de registro
             if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
@@ -197,7 +203,8 @@ class TaskStartButton(discord.ui.Button):
                     view = TareaControlView(user_id, tarea_id)
                     await canal_registro.send(embed=embed, view=view)
             
-            # Eliminar el mensaje del botón inmediatamente
+            # Eliminar el mensaje del botón después de 2 minutos
+            await asyncio.sleep(120)
             try:
                 await interaction.message.delete()
             except:
@@ -241,8 +248,8 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 ''                # tiempo_pausada
             )
             
-            # Enviar confirmación efímera al usuario
-            await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=True)
+            # Enviar confirmación al usuario
+            await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=False)
             
             # Enviar embed al canal de registro
             if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
@@ -546,7 +553,8 @@ class IniciarTrackingButton(discord.ui.Button):
         if str(interaction.user.id) != str(self.user_id):
             await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
             return
-        await interaction.response.send_message('Usa el comando `/tracking` en este canal para consultar el estado de un envío.', ephemeral=True)
+        from interactions.modals import TrackingModal
+        await interaction.response.send_modal(TrackingModal())
 
 class IniciarBuscarCasoView(discord.ui.View):
     def __init__(self, user_id):
@@ -614,7 +622,7 @@ class TrackingButton(discord.ui.Button):
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                msg = await canal.send(f'📦 {interaction.user.mention}, para consultar el estado de un envío, usa el comando `/tracking` en este canal.')
+                msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para consultar el estado de un envío:', view=IniciarTrackingView(interaction.user.id))
                 await asyncio.sleep(120)
                 try:
                     await msg.delete()
