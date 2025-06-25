@@ -608,7 +608,7 @@ class TrackingButton(discord.ui.Button):
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                msg = await canal.send(f'📦 {interaction.user.mention}, para consultar el estado de un envío, usa el comando `/tracking` en este canal.', view=IniciarTrackingView(interaction.user.id))
+                msg = await canal.send(f'📦 {interaction.user.mention}, para consultar el estado de un envío, usa el comando `/tracking` en este canal.')
                 await asyncio.sleep(300)
                 try:
                     await msg.delete()
@@ -628,7 +628,7 @@ class BuscarCasoButton(discord.ui.Button):
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                msg = await canal.send(f'🔍 {interaction.user.mention}, para buscar un caso, usa el comando `/buscar-caso` en este canal.', view=IniciarBuscarCasoView(interaction.user.id))
+                msg = await canal.send(f'🔍 {interaction.user.mention}, para buscar un caso, usa el comando `/buscar-caso` en este canal.')
                 await asyncio.sleep(300)
                 try:
                     await msg.delete()
