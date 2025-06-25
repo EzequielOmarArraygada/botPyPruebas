@@ -65,107 +65,57 @@ def check_if_pedido_exists(sheet, sheet_range: str, pedido_number: str) -> bool:
 async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id: int, guild_id: int):
     """
     Verifica errores en la hoja de Google Sheets y notifica en Discord.
-    :param bot: Instancia de discord.ext.commands.Bot
-    :param sheet: Instancia de gspread.Worksheet
-    :param sheet_range: Rango de lectura (ej: 'A:K' o 'SheetName!A:K')
-    :param target_channel_id: ID del canal de Discord para notificaciones
-    :param guild_id: ID del servidor de Discord
     """
     print('Iniciando verificación de errores en Google Sheets...')
-    print(f'Hoja actual: {sheet.title}')
-    print(f'Rango solicitado: {sheet_range}')
-    
     try:
-        # Verificar si el rango incluye un nombre de hoja específica
         hoja_nombre = None
         sheet_range_puro = sheet_range
-        
         if '!' in sheet_range:
-            # Si el rango tiene formato 'SheetName!Range', extraer nombre de hoja y rango
             parts = sheet_range.split('!')
             if len(parts) == 2:
-                hoja_nombre = parts[0].strip("'")  # Remover comillas si las hay
+                hoja_nombre = parts[0].strip("'")
                 sheet_range_puro = parts[1]
-                print(f"Nombre de hoja extraído: '{hoja_nombre}'")
-                print(f"Rango puro: '{sheet_range_puro}'")
-                
-                # Obtener la hoja específica
                 try:
                     spreadsheet = sheet.spreadsheet
                     sheet = spreadsheet.worksheet(hoja_nombre)
-                    print(f"Cambiado a hoja: {sheet.title}")
                 except Exception as e:
-                    print(f"Error al cambiar a la hoja '{hoja_nombre}': {e}")
                     return
-        
-        # Validar formato del rango
         if not sheet_range_puro or ':' not in sheet_range_puro:
-            print(f"Error: Rango inválido '{sheet_range_puro}'. Debe tener formato 'A:K'")
             return
-        
-        print(f'Intentando leer rango: {sheet_range_puro}')
         rows = sheet.get(sheet_range_puro)
-        print(f'Filas leídas: {len(rows) if rows else 0}')
-        
         if not rows:
-            print('No se leyeron datos de la hoja. Verificando si la hoja tiene datos...')
-            # Intentar leer un rango más amplio para ver si hay datos
             try:
                 test_rows = sheet.get('A1:Z10')
-                print(f'Datos de prueba (A1:Z10): {test_rows}')
             except Exception as e:
-                print(f'Error al leer datos de prueba: {e}')
+                pass
             return
-        
         if len(rows) <= 1:
-            print('Solo hay una fila o menos en la hoja. Datos encontrados:', rows)
             return
-            
         cases_channel = bot.get_channel(target_channel_id)
         if not cases_channel:
-            print(f"Error: No se pudo encontrar el canal de Discord con ID {target_channel_id}.")
             return
         guild = bot.get_guild(guild_id)
         if not guild:
-            print(f"Error: No se pudo encontrar el servidor de Discord con ID {guild_id}.")
             return
-        # Obtener todos los miembros del guild
         try:
             members = [member async for member in guild.fetch_members()]
         except Exception:
-            members = guild.members  # fallback si ya están en caché
-        
+            members = guild.members
         header_row = rows[0]
-        print(f"Encabezados encontrados en la hoja: {header_row}")
-        print(f"Número de columnas en encabezados: {len(header_row)}")
-        
-        # Buscar los índices de las columnas por título (más robusto)
         def normaliza_encabezado(h):
             if not h:
                 return ''
-            # Eliminar caracteres invisibles y normalizar
             return str(h).strip().replace('\u200b', '').replace('\ufeff', '').lower()
-        
         error_column_index = None
         notified_column_index = None
-        
         for i, header in enumerate(header_row):
             normalized_header = normaliza_encabezado(header)
-            print(f"Columna {i}: '{header}' -> normalizado: '{normalized_header}'")
-            
             if normalized_header == 'error':
                 error_column_index = i
-                print(f"Columna ERROR encontrada en índice {i}")
             elif normalized_header == 'errorenviocheck':
                 notified_column_index = i
-                print(f"Columna ErrorEnvioCheck encontrada en índice {i}")
-        
         if error_column_index is None or notified_column_index is None:
-            print('No se encontraron las columnas "ERROR" o "ErrorEnvioCheck" en la hoja.')
-            print(f'Columna ERROR encontrada: {error_column_index is not None}')
-            print(f'Columna ErrorEnvioCheck encontrada: {notified_column_index is not None}')
             return
-        
         for i, row in enumerate(rows[1:], start=2):
             error_value = str(row[error_column_index]).strip() if len(row) > error_column_index and row[error_column_index] else ''
             notified_value = str(row[notified_column_index]).strip() if len(row) > notified_column_index and row[notified_column_index] else ''
@@ -193,34 +143,14 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                 )
                 try:
                     await cases_channel.send(notification_message)
-                    # Marcar como notificado
                     tz = pytz.timezone('America/Argentina/Buenos_Aires')
                     now = datetime.now(tz)
                     notification_timestamp = now.strftime('%d-%m-%Y %H:%M:%S')
-                    
-                    # Convertir índice de columna a letra (corregido)
-                    def colnum_string(n):
-                        result = ""
-                        while n >= 0:
-                            n, remainder = divmod(n, 26)
-                            result = chr(65 + remainder) + result
-                            n -= 1
-                        return result
-                    
-                    notified_col_letter = colnum_string(notified_column_index)
-                    update_cell = f'{notified_col_letter}{i}'
-                    print(f'Intentando marcar celda {update_cell} como notificada...')
-                    
-                    # Usar update_cell en lugar de update para una sola celda
-                    sheet.update_cell(i, notified_column_index + 1, f'Notificado {notification_timestamp}')
-                    print(f'Fila {i} marcada como notificada en Google Sheets.')
-                except Exception as send_or_update_error:
-                    print(f'Error al enviar el mensaje de notificación o marcar la fila {i}:', send_or_update_error)
-        print('Verificación de errores en Google Sheets completada.')
+                except Exception as e:
+                    pass
     except Exception as error:
-        print('Error al leer la hoja de Google Sheets para verificar errores:', error)
-        print(f'Rango utilizado: {sheet_range}')
-        print('Sugerencia: Verifica que el rango tenga formato correcto (ej: A:K)')
+        pass
+    print('Verificación de errores en Google Sheets completada.')
 
 def funcion_google_sheets():
     pass 

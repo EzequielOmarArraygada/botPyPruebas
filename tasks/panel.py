@@ -222,7 +222,6 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
         tz = pytz.timezone('America/Argentina/Buenos_Aires')
         now = datetime.now(tz)
         inicio = now.strftime('%d/%m/%Y %H:%M:%S')
-        
         try:
             tarea_id = google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
             google_sheets.agregar_evento_historial(
@@ -237,31 +236,14 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 'Inicio',         # tipo_evento
                 ''                # tiempo_pausada
             )
-            
-            # Enviar confirmación al usuario
-            await interaction.response.send_message(f'¡Tarea "Otra" iniciada y registrada! Observaciones: {obs}', ephemeral=False)
-            
-            # Enviar embed al canal de registro
+            # Enviar embed al canal de registro (sin borrado)
             if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
                 canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
                 if canal_registro:
                     embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id, tarea_id)
-                    msg_registro = await canal_registro.send(embed=embed, view=view)
-                    # Borrar el mensaje de registro después de 2 minutos
-                    await asyncio.sleep(120)
-                    try:
-                        await msg_registro.delete()
-                    except:
-                        pass
-            
-            # Eliminar el mensaje del modal después de 20 segundos
-            await asyncio.sleep(20)
-            try:
-                await interaction.message.delete()
-            except:
-                pass
-            
+                    await canal_registro.send(embed=embed, view=view)
+            # No enviar mensaje de confirmación en el canal del panel
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
                 await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
