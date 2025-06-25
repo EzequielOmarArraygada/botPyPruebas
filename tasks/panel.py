@@ -490,58 +490,153 @@ def safe_int(val):
     except (TypeError, ValueError):
         return None
 
+# --- VIEWS PARA INICIAR FLUJOS EN EL CANAL CORRECTO ---
+class IniciarFacturaAView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.add_item(IniciarFacturaAButton(user_id))
+
+class IniciarFacturaAButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar Factura A', style=discord.ButtonStyle.success)
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != str(self.user_id):
+            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+            return
+        from interactions.modals import FacturaAModal
+        await interaction.response.send_modal(FacturaAModal())
+
+class IniciarCasoView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.add_item(IniciarCasoButton(user_id))
+
+class IniciarCasoButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar registro de caso', style=discord.ButtonStyle.success)
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != str(self.user_id):
+            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+            return
+        from interactions.select_menus import build_tipo_solicitud_select_menu
+        view = build_tipo_solicitud_select_menu()
+        await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
+
+class IniciarTrackingView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.add_item(IniciarTrackingButton(user_id))
+
+class IniciarTrackingButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar consulta de tracking', style=discord.ButtonStyle.primary)
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != str(self.user_id):
+            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+            return
+        await interaction.response.send_message('Usa el comando /tracking en este canal para consultar el estado de un envío.', ephemeral=True)
+
+class IniciarBuscarCasoView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.add_item(IniciarBuscarCasoButton(user_id))
+
+class IniciarBuscarCasoButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar búsqueda de caso', style=discord.ButtonStyle.primary)
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != str(self.user_id):
+            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+            return
+        await interaction.response.send_message('Usa el comando /buscar-caso en este canal para buscar un caso.', ephemeral=True)
+
 class FacturaAButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Factura A', emoji='🧾', style=discord.ButtonStyle.success, custom_id='panel_factura_a')
     async def callback(self, interaction: discord.Interaction):
-        from interactions.modals import FacturaAModal
-        await interaction.response.send_modal(FacturaAModal())
-        # Opcional: notificar en el canal correspondiente
         from config import TARGET_CHANNEL_ID_FAC_A
         canal_id = safe_int(TARGET_CHANNEL_ID_FAC_A)
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                await canal.send(f'{interaction.user.mention} inició una solicitud de Factura A (modal abierto).')
+                msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
+                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Factura A para que inicies tu solicitud.', ephemeral=True)
+                await asyncio.sleep(300)
+                try:
+                    await msg.delete()
+                except:
+                    pass
+            else:
+                await interaction.response.send_message('No se encontró el canal de Factura A.', ephemeral=True)
+        else:
+            await interaction.response.send_message('No se configuró el canal de Factura A.', ephemeral=True)
 
 class AgregarCasoButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Agregar caso', emoji='📝', style=discord.ButtonStyle.success, custom_id='panel_agregar_caso')
     async def callback(self, interaction: discord.Interaction):
-        from interactions.select_menus import build_tipo_solicitud_select_menu
-        view = build_tipo_solicitud_select_menu()
-        await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
-        # Opcional: notificar en el canal correspondiente
         from config import TARGET_CHANNEL_ID_CASOS
         canal_id = safe_int(TARGET_CHANNEL_ID_CASOS)
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                await canal.send(f'{interaction.user.mention} inició una solicitud de caso (select enviado por modal).')
+                msg = await canal.send(f'📝 {interaction.user.mention}, haz clic en el botón para iniciar el registro de un caso:', view=IniciarCasoView(interaction.user.id))
+                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Casos para que inicies el registro.', ephemeral=True)
+                await asyncio.sleep(300)
+                try:
+                    await msg.delete()
+                except:
+                    pass
+            else:
+                await interaction.response.send_message('No se encontró el canal de Casos.', ephemeral=True)
+        else:
+            await interaction.response.send_message('No se configuró el canal de Casos.', ephemeral=True)
 
 class TrackingButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Tracking', emoji='📦', style=discord.ButtonStyle.secondary, custom_id='panel_tracking')
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message('Para consulta de tracking, usa el comando /tracking en el canal correspondiente.', ephemeral=True)
         from config import TARGET_CHANNEL_ID_ENVIOS
         canal_id = safe_int(TARGET_CHANNEL_ID_ENVIOS)
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                await canal.send(f'{interaction.user.mention} para consulta de tracking. Usa el comando /tracking en este canal.')
+                msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para iniciar una consulta de tracking:', view=IniciarTrackingView(interaction.user.id))
+                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Envíos para que inicies la consulta.', ephemeral=True)
+                await asyncio.sleep(300)
+                try:
+                    await msg.delete()
+                except:
+                    pass
+            else:
+                await interaction.response.send_message('No se encontró el canal de Envíos.', ephemeral=True)
+        else:
+            await interaction.response.send_message('No se configuró el canal de Envíos.', ephemeral=True)
 
 class BuscarCasoButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Buscar caso', emoji='🔍', style=discord.ButtonStyle.secondary, custom_id='panel_buscar_caso')
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message('Para búsqueda de caso, usa el comando /buscar-caso en el canal correspondiente.', ephemeral=True)
         from config import TARGET_CHANNEL_ID_BUSCAR_CASO
         canal_id = safe_int(TARGET_CHANNEL_ID_BUSCAR_CASO)
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                await canal.send(f'{interaction.user.mention} para búsqueda de caso. Usa el comando /buscar-caso en este canal.')
+                msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para iniciar la búsqueda de un caso:', view=IniciarBuscarCasoView(interaction.user.id))
+                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Búsqueda de Casos para que inicies la búsqueda.', ephemeral=True)
+                await asyncio.sleep(300)
+                try:
+                    await msg.delete()
+                except:
+                    pass
+            else:
+                await interaction.response.send_message('No se encontró el canal de Búsqueda de Casos.', ephemeral=True)
+        else:
+            await interaction.response.send_message('No se configuró el canal de Búsqueda de Casos.', ephemeral=True)
 
 class PanelComandos(commands.Cog):
     def __init__(self, bot):
