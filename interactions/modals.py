@@ -242,6 +242,7 @@ class TrackingModal(discord.ui.Modal, title='Consulta de Tracking'):
     async def on_submit(self, interaction: discord.Interaction):
         import config
         from utils.andreani import get_andreani_tracking
+        from datetime import datetime
         
         try:
             tracking_number = self.numero.value.strip()
@@ -260,18 +261,48 @@ class TrackingModal(discord.ui.Modal, title='Consulta de Tracking'):
             # Consultar tracking (función síncrona)
             tracking_data = get_andreani_tracking(tracking_number, config.ANDREANI_AUTH_HEADER)
             
-            # Formatear respuesta
-            if tracking_data and 'estado' in tracking_data:
-                estado = tracking_data['estado']
-                tracking_info = f"📦 **Estado del envío {tracking_number}:**\n\n{estado}"
+            # Procesar respuesta igual que el comando original
+            if tracking_data:
+                info = tracking_data
+                # Estado actual y fecha
+                estado = info.get('procesoActual', {}).get('titulo', 'Sin datos')
+                fecha_entrega = clean_html(info.get('fechaEstimadaDeEntrega', ''))
+                tracking_info = f"📦 Estado del tracking {tracking_number}:\n{estado} - {fecha_entrega}\n\n"
+                # Historial
+                timelines = info.get('timelines', [])
+                if timelines:
+                    tracking_info += "Historial:\n"
+                    # Ordenar por fecha descendente
+                    eventos = []
+                    for tl in sorted(timelines, key=lambda x: x.get('orden', 0), reverse=True):
+                        for traduccion in tl.get('traducciones', []):
+                            fecha_iso = traduccion.get('fechaEvento', '')
+                            # Formatear fecha a dd/mm/yyyy HH:MM
+                            try:
+                                dt = datetime.fromisoformat(fecha_iso)
+                                fecha_fmt = dt.strftime('%d/%m/%Y, %H:%M')
+                            except Exception:
+                                fecha_fmt = fecha_iso
+                            desc = clean_html(traduccion.get('traduccion', ''))
+                            suc = traduccion.get('sucursal', {}).get('nombre', '')
+                            eventos.append(f"{fecha_fmt}: {desc} ({suc})")
+                    tracking_info += '\n'.join(eventos)
+                else:
+                    tracking_info += "Historial: No disponible\n"
             else:
-                tracking_info = f"❌ No se encontró información para el número de seguimiento **{tracking_number}**."
+                tracking_info = f"😕 No se pudo encontrar la información de tracking para **{tracking_number}**."
             
             # Enviar resultado
             await interaction.followup.send(tracking_info, ephemeral=False)
             
         except Exception as error:
             await interaction.followup.send(f'❌ Hubo un error al consultar el tracking. Detalles: {error}', ephemeral=True)
+
+def clean_html(raw_html):
+    """Limpia etiquetas HTML de un string"""
+    import re
+    clean = re.compile('<.*?>')
+    return re.sub(clean, '', raw_html)
 
 class Modals(commands.Cog):
     def __init__(self, bot):
