@@ -520,6 +520,9 @@ class IniciarCasoButton(discord.ui.Button):
         if str(interaction.user.id) != str(self.user_id):
             await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
             return
+        # Inicializar el state del usuario igual que /agregar-caso
+        from utils.state_manager import set_user_state
+        set_user_state(str(interaction.user.id), {"type": "caso", "paso": 1})
         from interactions.select_menus import build_tipo_solicitud_select_menu
         view = build_tipo_solicitud_select_menu()
         await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
@@ -537,7 +540,7 @@ class IniciarTrackingButton(discord.ui.Button):
         if str(interaction.user.id) != str(self.user_id):
             await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
             return
-        await interaction.response.send_message('Usa el comando /tracking en este canal para consultar el estado de un envío.', ephemeral=True)
+        await interaction.response.send_message('Usa el comando `/tracking` en este canal para consultar el estado de un envío.', ephemeral=True)
 
 class IniciarBuscarCasoView(discord.ui.View):
     def __init__(self, user_id):
@@ -552,7 +555,7 @@ class IniciarBuscarCasoButton(discord.ui.Button):
         if str(interaction.user.id) != str(self.user_id):
             await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
             return
-        await interaction.response.send_message('Usa el comando /buscar-caso en este canal para buscar un caso.', ephemeral=True)
+        await interaction.response.send_message('Usa el comando `/buscar-caso` en este canal para buscar un caso.', ephemeral=True)
 
 class FacturaAButton(discord.ui.Button):
     def __init__(self):
@@ -564,7 +567,7 @@ class FacturaAButton(discord.ui.Button):
             canal = interaction.guild.get_channel(canal_id)
             if canal:
                 msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
-                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Factura A para que inicies tu solicitud.', ephemeral=True)
+                # No enviar mensaje efímero en el panel de comandos
                 await asyncio.sleep(300)
                 try:
                     await msg.delete()
@@ -585,7 +588,7 @@ class AgregarCasoButton(discord.ui.Button):
             canal = interaction.guild.get_channel(canal_id)
             if canal:
                 msg = await canal.send(f'📝 {interaction.user.mention}, haz clic en el botón para iniciar el registro de un caso:', view=IniciarCasoView(interaction.user.id))
-                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Casos para que inicies el registro.', ephemeral=True)
+                # No enviar mensaje efímero en el panel de comandos
                 await asyncio.sleep(300)
                 try:
                     await msg.delete()
@@ -605,8 +608,7 @@ class TrackingButton(discord.ui.Button):
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para iniciar una consulta de tracking:', view=IniciarTrackingView(interaction.user.id))
-                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Envíos para que inicies la consulta.', ephemeral=True)
+                msg = await canal.send(f'📦 {interaction.user.mention}, para consultar el estado de un envío, usa el comando `/tracking` en este canal.', view=IniciarTrackingView(interaction.user.id))
                 await asyncio.sleep(300)
                 try:
                     await msg.delete()
@@ -626,8 +628,7 @@ class BuscarCasoButton(discord.ui.Button):
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para iniciar la búsqueda de un caso:', view=IniciarBuscarCasoView(interaction.user.id))
-                await interaction.response.send_message('Se ha enviado un mensaje en el canal de Búsqueda de Casos para que inicies la búsqueda.', ephemeral=True)
+                msg = await canal.send(f'🔍 {interaction.user.mention}, para buscar un caso, usa el comando `/buscar-caso` en este canal.', view=IniciarBuscarCasoView(interaction.user.id))
                 await asyncio.sleep(300)
                 try:
                     await msg.delete()
