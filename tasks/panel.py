@@ -498,8 +498,7 @@ class FacturaAButton(discord.ui.Button):
                 await canal.send_modal(FacturaAModal())
             except Exception as e:
                 await canal.send(f'Error al mostrar el modal: {e}')
-        # Solo defer, nunca enviar mensaje en el canal del panel
-        await interaction.response.defer(thinking=False)
+        await interaction.response.defer()  # No responder en el canal del panel
 
 class AgregarCasoButton(discord.ui.Button):
     def __init__(self):
@@ -510,10 +509,11 @@ class AgregarCasoButton(discord.ui.Button):
         canal = interaction.guild.get_channel(canal_id)
         if canal:
             await canal.send(f'{interaction.user.mention} inició una solicitud de caso:')
+            # Simular el flujo de agregar caso (puedes mejorar esto para llamar el flujo real)
             from interactions.select_menus import build_tipo_solicitud_select_menu
             view = build_tipo_solicitud_select_menu()
             await canal.send('Por favor, selecciona el tipo de solicitud:', view=view)
-        await interaction.response.defer(thinking=False)
+        await interaction.response.defer()
 
 class TrackingButton(discord.ui.Button):
     def __init__(self):
@@ -524,7 +524,7 @@ class TrackingButton(discord.ui.Button):
         canal = interaction.guild.get_channel(canal_id)
         if canal:
             await canal.send(f'{interaction.user.mention} para consulta de tracking. Usa el comando /tracking en este canal.')
-        await interaction.response.defer(thinking=False)
+        await interaction.response.defer()
 
 class BuscarCasoButton(discord.ui.Button):
     def __init__(self):
@@ -535,7 +535,7 @@ class BuscarCasoButton(discord.ui.Button):
         canal = interaction.guild.get_channel(canal_id)
         if canal:
             await canal.send(f'{interaction.user.mention} para búsqueda de caso. Usa el comando /buscar-caso en este canal.')
-        await interaction.response.defer(thinking=False)
+        await interaction.response.defer()
 
 class PanelComandos(commands.Cog):
     def __init__(self, bot):

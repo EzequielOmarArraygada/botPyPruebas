@@ -4,6 +4,9 @@ from discord.ui import Button, View
 from interactions.modals import CasoModal
 import utils.state_manager as state_manager
 import config
+from utils.state_manager import generar_solicitud_id
+import time
+from utils.state_manager import cleanup_expired_states
 
 # --- NUEVO: Definición de la View y el Button fuera de la función ---
 class CompleteCasoButton(Button):
@@ -24,6 +27,7 @@ class InteractionSelects(commands.Cog):
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
+        cleanup_expired_states()
         # --- Manejar Select Menu de Tipo de Solicitud ---
         if (interaction.type == discord.InteractionType.component and 
             interaction.data and 
@@ -41,10 +45,14 @@ class InteractionSelects(commands.Cog):
                         if 'values' in select_data and select_data['values']:
                             selected_tipo = select_data['values'][0]
                             print(f"DEBUG: Tipo seleccionado: {selected_tipo}")
+                            solicitud_id = generar_solicitud_id(user_id)
+                            now = time.time()
                             state_manager.set_user_state(user_id, {
                                 "type": "caso",
                                 "paso": 2,
-                                "tipoSolicitud": selected_tipo
+                                "tipoSolicitud": selected_tipo,
+                                "solicitud_id": solicitud_id,
+                                "timestamp": now
                             })
                             print('DEBUG: Estado actualizado, creando CompleteCasoView...')
                             try:
