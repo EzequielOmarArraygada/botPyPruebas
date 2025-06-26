@@ -249,6 +249,44 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
                 sheet.update_cell(first_empty_row, col_map['datos'] + 1, datos_contacto)
             confirmation_message = f"""✅ **Caso registrado exitosamente**\n\n📋 **Detalles del caso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n\nEl caso ha sido guardado en Google Sheets y será monitoreado automáticamente."""
             await interaction.response.send_message(confirmation_message, ephemeral=True)
+            # --- AGREGAR DESPLEGABLES ---
+            try:
+                from utils.google_sheets import set_dropdown_validation
+                # Obtener sheetId
+                sheet_id = sheet._properties['sheetId']
+                # Buscar índice de columnas
+                col_agente_back = None
+                col_resuelto = None
+                for idx, col_name in enumerate(header):
+                    norm = normaliza_columna(col_name)
+                    if norm == normaliza_columna('Agente Back'):
+                        col_agente_back = idx + 1  # 1-based
+                    if norm == normaliza_columna('Resuelto'):
+                        col_resuelto = idx + 1
+                # Solo si existen ambas columnas
+                if col_agente_back:
+                    set_dropdown_validation(
+                        config.GOOGLE_CREDENTIALS_JSON,
+                        config.SPREADSHEET_ID_CASOS,
+                        sheet_id,
+                        first_empty_row,
+                        col_agente_back,
+                        ["Aldo", "Ariel", "Nico", "Kevin"],
+                        color={"red": 0.9, "green": 0.9, "blue": 1.0}
+                    )
+                if col_resuelto:
+                    set_dropdown_validation(
+                        config.GOOGLE_CREDENTIALS_JSON,
+                        config.SPREADSHEET_ID_CASOS,
+                        sheet_id,
+                        first_empty_row,
+                        col_resuelto,
+                        ["Si", "No"],
+                        color={"red": 0.8, "green": 1.0, "blue": 0.8}
+                    )
+            except Exception as e:
+                print(f"[Desplegables] Error al agregar validación de datos: {e}")
+            # --- FIN AGREGAR DESPLEGABLES ---
             state_manager.delete_user_state(user_id)
         except Exception as error:
             print('Error general durante el procesamiento del modal de caso (on_submit):', error)

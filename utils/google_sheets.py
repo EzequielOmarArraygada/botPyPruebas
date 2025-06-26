@@ -4,6 +4,7 @@ from datetime import datetime
 import pytz
 import discord
 import json
+from googleapiclient.discovery import build
 
 def initialize_google_sheets(credentials_json: str):
     try:
@@ -631,4 +632,67 @@ def obtener_tarea_activa_por_usuario(sheet, user_id):
         return None
     except Exception as e:
         print(f'[ERROR] obtener_tarea_activa_por_usuario: {e}')
-        return None 
+        return None
+
+def set_dropdown_validation(credentials_json, spreadsheet_id, sheet_id, row, col, values, color=None):
+    """
+    Aplica una validación de datos (desplegable) en una celda específica.
+    row y col empiezan en 1.
+    color es un dict opcional: {'red': 0.9, 'green': 0.9, 'blue': 1.0}
+    """
+    scopes = ['https://www.googleapis.com/auth/spreadsheets']
+    if isinstance(credentials_json, str):
+        creds_dict = json.loads(credentials_json)
+    else:
+        creds_dict = credentials_json
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    service = build('sheets', 'v4', credentials=creds)
+
+    requests = [{
+        "setDataValidation": {
+            "range": {
+                "sheetId": sheet_id,
+                "startRowIndex": row-1,
+                "endRowIndex": row,
+                "startColumnIndex": col-1,
+                "endColumnIndex": col
+            },
+            "rule": {
+                "condition": {
+                    "type": "ONE_OF_LIST",
+                    "values": [{"userEnteredValue": v} for v in values]
+                },
+                "showCustomUi": True,
+                "strict": True
+            }
+        }
+    }]
+    if color:
+        requests.append({
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{
+                        "sheetId": sheet_id,
+                        "startRowIndex": row-1,
+                        "endRowIndex": row,
+                        "startColumnIndex": col-1,
+                        "endColumnIndex": col
+                    }],
+                    "booleanRule": {
+                        "condition": {
+                            "type": "CUSTOM_FORMULA",
+                            "values": [{"userEnteredValue": "=TRUE()"}]
+                        },
+                        "format": {
+                            "backgroundColor": color
+                        }
+                    }
+                },
+                "index": 0
+            }
+        })
+    body = {'requests': requests}
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body=body
+    ).execute() 
