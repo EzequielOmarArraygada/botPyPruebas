@@ -203,25 +203,50 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
             agente_name = interaction.user.display_name
-            row_data = [
-                pedido,           # A - Número de Pedido
-                fecha_hora,       # B - Fecha
-                agente_name,      # C - Agente
-                numero_caso,      # D - Número de Caso
-                tipo_solicitud,   # E - Tipo de Solicitud
-                datos_contacto,   # F - Datos de Contacto
-                '',               # G - Estado
-                '',               # H - Observaciones
-                '',               # I - Error
-                ''                # J - Notificado
-            ]
-            # Ajustar la cantidad de columnas al header
+            # Buscar la primera fila vacía y escribir solo en las columnas necesarias
             header = rows[0] if rows else []
-            if len(row_data) < len(header):
-                row_data += [''] * (len(header) - len(row_data))
-            elif len(row_data) > len(header):
-                row_data = row_data[:len(header)]
-            sheet.append_row(row_data)
+            # Normalizar nombres de columnas
+            def normaliza_columna(nombre):
+                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
+            col_map = {}
+            for idx, col_name in enumerate(header):
+                norm = normaliza_columna(col_name)
+                if norm == normaliza_columna('Número de pedido'):
+                    col_map['pedido'] = idx
+                if norm == normaliza_columna('Fecha'):
+                    col_map['fecha'] = idx
+                if norm == normaliza_columna('Agente carga'):
+                    col_map['agente'] = idx
+                if norm == normaliza_columna('CASO ID'):
+                    col_map['caso'] = idx
+                if norm == normaliza_columna('Solicitud'):
+                    col_map['solicitud'] = idx
+                if norm == normaliza_columna('Dirección/Teléfono/Datos (Gestión Front)'):
+                    col_map['datos'] = idx
+            # Buscar la primera fila vacía (donde la columna pedido esté vacía)
+            first_empty_row = None
+            for i, row in enumerate(rows[1:], start=2):
+                pedido_idx = col_map.get('pedido')
+                if pedido_idx is not None and (len(row) <= pedido_idx or not str(row[pedido_idx]).strip()):
+                    first_empty_row = i
+                    break
+            if first_empty_row is None:
+                await interaction.response.send_message('❌ No hay filas vacías disponibles para registrar el caso. Agrega más filas plantilla en la hoja.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            # Escribir los datos solo en las columnas correspondientes
+            if 'pedido' in col_map:
+                sheet.update_cell(first_empty_row, col_map['pedido'] + 1, pedido)
+            if 'fecha' in col_map:
+                sheet.update_cell(first_empty_row, col_map['fecha'] + 1, fecha_hora)
+            if 'agente' in col_map:
+                sheet.update_cell(first_empty_row, col_map['agente'] + 1, agente_name)
+            if 'caso' in col_map:
+                sheet.update_cell(first_empty_row, col_map['caso'] + 1, numero_caso)
+            if 'solicitud' in col_map:
+                sheet.update_cell(first_empty_row, col_map['solicitud'] + 1, tipo_solicitud)
+            if 'datos' in col_map:
+                sheet.update_cell(first_empty_row, col_map['datos'] + 1, datos_contacto)
             confirmation_message = f"""✅ **Caso registrado exitosamente**\n\n📋 **Detalles del caso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n\nEl caso ha sido guardado en Google Sheets y será monitoreado automáticamente."""
             await interaction.response.send_message(confirmation_message, ephemeral=True)
             state_manager.delete_user_state(user_id)
