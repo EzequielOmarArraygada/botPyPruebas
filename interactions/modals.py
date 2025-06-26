@@ -107,13 +107,13 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
         except Exception as error:
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud de Factura A. Detalles: {error}', ephemeral=True)
 
-class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
+class CambioDevolucionModal(discord.ui.Modal, title='Detalles del Cambio/Devolución'):
     def __init__(self):
-        super().__init__(custom_id='casoModal')
+        super().__init__(custom_id='cambioDevolucionModal')
         self.pedido = discord.ui.TextInput(
             label="Número de Pedido",
             placeholder="Ingresa el número de pedido...",
-            custom_id="casoPedidoInput",
+            custom_id="cambioDevolucionPedidoInput",
             style=discord.TextStyle.short,
             required=True,
             max_length=100
@@ -121,7 +121,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
         self.numero_caso = discord.ui.TextInput(
             label="Número de Caso",
             placeholder="Ingresa el número de caso...",
-            custom_id="casoNumeroCasoInput",
+            custom_id="cambioDevolucionNumeroCasoInput",
             style=discord.TextStyle.short,
             required=True,
             max_length=100
@@ -129,7 +129,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
         self.datos_contacto = discord.ui.TextInput(
             label="Dirección / Teléfono / Otros Datos",
             placeholder="Ingresa los datos de contacto...",
-            custom_id="casoDatosContactoInput",
+            custom_id="cambioDevolucionDatosContactoInput",
             style=discord.TextStyle.paragraph,
             required=True,
             max_length=1000
@@ -149,7 +149,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             user_id = str(interaction.user.id)
             pending_data = state_manager.get_user_state(user_id)
             if not pending_data or pending_data.get('type') != 'caso':
-                await interaction.response.send_message('❌ Error: No hay un proceso de caso activo. Usa /agregar-caso para empezar.', ephemeral=True)
+                await interaction.response.send_message('❌ Error: No hay un proceso de cambio/devolución activo. Usa /cambios-devoluciones para empezar.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
                 return
             # Recuperar datos del modal
@@ -172,7 +172,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
                 state_manager.delete_user_state(user_id)
                 return
             if not config.SPREADSHEET_ID_CASOS:
-                await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Cambios/Devoluciones no está configurado.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
                 return
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
@@ -196,7 +196,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             rows = sheet.get(sheet_range_puro)
             is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             if is_duplicate:
-                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Casos.', ephemeral=True)
+                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Cambios/Devoluciones.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
                 return
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
@@ -239,12 +239,12 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             if idx_resuelto is not None:
                 row_data[idx_resuelto] = 'No'
             sheet.append_row(row_data)
-            confirmation_message = f"""✅ **Caso registrado exitosamente**\n\n📋 **Detalles del caso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n\nEl caso ha sido guardado en Google Sheets y será monitoreado automáticamente."""
+            confirmation_message = f"""✅ **Cambio/Devolución registrado exitosamente**\n\n📋 **Detalles de la solicitud:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n\nLa solicitud ha sido guardada en Google Sheets y será monitoreada automáticamente."""
             await interaction.response.send_message(confirmation_message, ephemeral=True)
             state_manager.delete_user_state(user_id)
         except Exception as error:
-            print('Error general durante el procesamiento del modal de caso (on_submit):', error)
-            await interaction.response.send_message(f'❌ Hubo un error al procesar tu caso. Detalles: {error}', ephemeral=True)
+            print('Error general durante el procesamiento del modal de cambio/devolución (on_submit):', error)
+            await interaction.response.send_message(f'❌ Hubo un error al procesar tu cambio/devolución. Detalles: {error}', ephemeral=True)
             state_manager.delete_user_state(str(interaction.user.id))
 
 class TrackingModal(discord.ui.Modal, title='Consulta de Tracking'):
@@ -532,7 +532,7 @@ class Modals(commands.Cog):
     @commands.command()
     async def caso(self, ctx):
         """Muestra el modal de Caso"""
-        modal = CasoModal()
+        modal = CambioDevolucionModal()
         await ctx.send_modal(modal)
 
 async def setup(bot):
