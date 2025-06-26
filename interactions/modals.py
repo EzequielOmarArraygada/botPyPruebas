@@ -85,7 +85,7 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
                 sheet = spreadsheet.worksheet(hoja_nombre)
             else:
                 sheet = spreadsheet.sheet1
-            rows = sheet.get(sheet_range_puro)
+            rows = sheet.get_all_values()
             is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             if is_duplicate:
                 await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Factura A.', ephemeral=True)
@@ -193,7 +193,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
                 sheet = spreadsheet.worksheet(hoja_nombre)
             else:
                 sheet = spreadsheet.sheet1
-            rows = sheet.get(sheet_range_puro)
+            rows = sheet.get_all_values()
             is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             if is_duplicate:
                 await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Casos.', ephemeral=True)
@@ -421,7 +421,7 @@ class BuscarCasoModal(discord.ui.Modal, title='Búsqueda de Caso'):
             for sheet_name in config.SHEETS_TO_SEARCH:
                 try:
                     sheet = spreadsheet.worksheet(sheet_name)
-                    rows = sheet.get('A:Z')
+                    rows = sheet.get_all_values()
                 except Exception as sheet_error:
                     search_summary += f"⚠️ Error al leer la pestaña \"{sheet_name}\".\n"
                     continue
