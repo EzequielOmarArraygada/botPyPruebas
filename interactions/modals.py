@@ -217,10 +217,27 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             ]
             # Ajustar la cantidad de columnas al header
             header = rows[0] if rows else []
+            # Buscar índices de 'Agente Back' y 'Resuelto'
+            def normaliza_columna(nombre):
+                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
+            idx_agente_back = None
+            idx_resuelto = None
+            for idx, col_name in enumerate(header):
+                norm = normaliza_columna(col_name)
+                if norm == normaliza_columna('Agente Back'):
+                    idx_agente_back = idx
+                if norm == normaliza_columna('Resuelto'):
+                    idx_resuelto = idx
+            # Ajustar row_data al header
             if len(row_data) < len(header):
                 row_data += [''] * (len(header) - len(row_data))
             elif len(row_data) > len(header):
                 row_data = row_data[:len(header)]
+            # Cargar valores por defecto en las columnas especiales
+            if idx_agente_back is not None:
+                row_data[idx_agente_back] = 'Nadie'
+            if idx_resuelto is not None:
+                row_data[idx_resuelto] = 'No'
             sheet.append_row(row_data)
             confirmation_message = f"""✅ **Caso registrado exitosamente**\n\n📋 **Detalles del caso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n\nEl caso ha sido guardado en Google Sheets y será monitoreado automáticamente."""
             await interaction.response.send_message(confirmation_message, ephemeral=True)
