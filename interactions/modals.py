@@ -105,6 +105,7 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
                 confirmation_message += '\n\n⚠️ La carga de archivos adjuntos a Google Drive no está configurada en el bot para Factura A.'
             await interaction.response.send_message(confirmation_message, ephemeral=True)
         except Exception as error:
+            print('Error en FacturaAModal.on_submit:', error)
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud de Factura A. Detalles: {error}', ephemeral=True)
 
 class CambioDevolucionModal(discord.ui.Modal, title='Detalles del Cambio/Devolución'):
