@@ -100,7 +100,7 @@ class TaskPanelView(discord.ui.View):
 
 class TaskRegisterButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label='Registrar nueva tarea', style=discord.ButtonStyle.primary)
+        super().__init__(label='Registrar nueva tarea', style=discord.ButtonStyle.primary, custom_id='task_register_button')
 
     async def callback(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
@@ -154,7 +154,7 @@ class TaskStartButtonView(discord.ui.View):
 
 class TaskStartButton(discord.ui.Button):
     def __init__(self, tarea):
-        super().__init__(label='Comenzar', style=discord.ButtonStyle.success)
+        super().__init__(label='Comenzar', style=discord.ButtonStyle.success, custom_id=f'start_task_{tarea.replace(" ", "_").lower()}')
         self.tarea = tarea
 
     async def callback(self, interaction: discord.Interaction):
@@ -469,7 +469,7 @@ class IniciarFacturaAView(discord.ui.View):
 
 class IniciarFacturaAButton(discord.ui.Button):
     def __init__(self, user_id):
-        super().__init__(label='Iniciar Factura A', style=discord.ButtonStyle.success)
+        super().__init__(label='Iniciar Factura A', style=discord.ButtonStyle.success, custom_id=f'init_factura_a_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
         if str(interaction.user.id) != str(self.user_id):
@@ -485,7 +485,7 @@ class IniciarCasoView(discord.ui.View):
 
 class IniciarCasoButton(discord.ui.Button):
     def __init__(self, user_id):
-        super().__init__(label='Iniciar registro de caso', style=discord.ButtonStyle.success)
+        super().__init__(label='Iniciar registro de caso', style=discord.ButtonStyle.success, custom_id=f'init_caso_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
         if str(interaction.user.id) != str(self.user_id):
@@ -505,7 +505,7 @@ class IniciarTrackingView(discord.ui.View):
 
 class IniciarTrackingButton(discord.ui.Button):
     def __init__(self, user_id):
-        super().__init__(label='Iniciar consulta de tracking', style=discord.ButtonStyle.primary)
+        super().__init__(label='Iniciar consulta de tracking', style=discord.ButtonStyle.primary, custom_id=f'init_tracking_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
         if str(interaction.user.id) != str(self.user_id):
@@ -521,7 +521,7 @@ class IniciarBuscarCasoView(discord.ui.View):
 
 class IniciarBuscarCasoButton(discord.ui.Button):
     def __init__(self, user_id):
-        super().__init__(label='Iniciar búsqueda de caso', style=discord.ButtonStyle.primary)
+        super().__init__(label='Iniciar búsqueda de caso', style=discord.ButtonStyle.primary, custom_id=f'init_buscar_caso_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
         if str(interaction.user.id) != str(self.user_id):
