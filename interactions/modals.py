@@ -203,10 +203,29 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
             agente_name = interaction.user.display_name
-            # Buscar la primera fila vacía (todas las celdas vacías o solo espacios)
+            # Buscar la primera fila vacía (donde la columna 'Número de pedido' esté vacía o solo espacios)
+            header = rows[0] if rows else []
+            def normaliza_columna(nombre):
+                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
+            col_map = {}
+            for idx, col_name in enumerate(header):
+                norm = normaliza_columna(col_name)
+                if norm == normaliza_columna('Número de pedido'):
+                    col_map['pedido'] = idx
+                if norm == normaliza_columna('Fecha'):
+                    col_map['fecha'] = idx
+                if norm == normaliza_columna('Agente carga'):
+                    col_map['agente'] = idx
+                if norm == normaliza_columna('CASO ID'):
+                    col_map['caso'] = idx
+                if norm == normaliza_columna('Solicitud'):
+                    col_map['solicitud'] = idx
+                if norm == normaliza_columna('Dirección/Teléfono/Datos (Gestión Front)'):
+                    col_map['datos'] = idx
             first_empty_row = None
             for i, row in enumerate(rows[1:], start=2):
-                if all((not str(cell).strip()) for cell in row):
+                pedido_idx = col_map.get('pedido')
+                if pedido_idx is not None and (len(row) <= pedido_idx or not str(row[pedido_idx]).strip()):
                     first_empty_row = i
                     break
             if first_empty_row is None:
