@@ -215,6 +215,12 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
                 '',               # I - Error
                 ''                # J - Notificado
             ]
+            # Ajustar la cantidad de columnas al header
+            header = rows[0] if rows else []
+            if len(row_data) < len(header):
+                row_data += [''] * (len(header) - len(row_data))
+            elif len(row_data) > len(header):
+                row_data = row_data[:len(header)]
             sheet.append_row(row_data)
             confirmation_message = f"""✅ **Caso registrado exitosamente**\n\n📋 **Detalles del caso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n\nEl caso ha sido guardado en Google Sheets y será monitoreado automáticamente."""
             await interaction.response.send_message(confirmation_message, ephemeral=True)
