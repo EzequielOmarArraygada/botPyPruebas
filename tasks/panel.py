@@ -553,7 +553,7 @@ class FacturaAButton(discord.ui.Button):
 
 class AgregarCasoButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label='Agregar caso', emoji='📝', style=discord.ButtonStyle.success, custom_id='panel_agregar_caso')
+        super().__init__(label='Cambios/Devoluciones', emoji='📝', style=discord.ButtonStyle.success, custom_id='panel_agregar_caso')
     async def callback(self, interaction: discord.Interaction):
         from config import TARGET_CHANNEL_ID_CASOS
         canal_id = safe_int(TARGET_CHANNEL_ID_CASOS)
