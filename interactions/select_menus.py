@@ -22,7 +22,7 @@ def build_tipo_solicitud_select_menu():
                 min_values=1,
                 max_values=1,
                 options=options,
-                custom_id='casoTipoSolicitudSelect'
+                custom_id='cambioDevolucionTipoSolicitudSelect'
             )
 
     class TipoSolicitudView(discord.ui.View):

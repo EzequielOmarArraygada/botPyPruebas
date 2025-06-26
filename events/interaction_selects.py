@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from discord.ui import Button, View
-from interactions.modals import CasoModal
+from interactions.modals import CambioDevolucionModal
 import utils.state_manager as state_manager
 import config
 from utils.state_manager import generar_solicitud_id
@@ -31,7 +31,7 @@ class InteractionSelects(commands.Cog):
         # --- Manejar Select Menu de Tipo de Solicitud ---
         if (interaction.type == discord.InteractionType.component and 
             interaction.data and 
-            interaction.data.get('custom_id') == 'casoTipoSolicitudSelect'):
+            interaction.data.get('custom_id') == 'cambioDevolucionTipoSolicitudSelect'):
             
             print('DEBUG: Interacción recibida del select menu')
             try:
@@ -61,7 +61,7 @@ class InteractionSelects(commands.Cog):
                                 print('DEBUG: Después de crear CompleteCasoView')
                                 print('DEBUG: Antes de enviar mensaje con botón')
                                 await interaction.response.send_message(
-                                    content=f"Tipo de solicitud seleccionado: **{selected_tipo}**\n\nHaz clic en el botón para completar los detalles del caso.",
+                                    content=f"Tipo de cambio/devolución seleccionado: **{selected_tipo}**\n\nHaz clic en el botón para completar los detalles del cambio/devolución.",
                                     view=view,
                                     ephemeral=True
                                 )
@@ -80,7 +80,7 @@ class InteractionSelects(commands.Cog):
                         state_manager.delete_user_state(user_id)
                 else:
                     await interaction.response.edit_message(
-                        content='Esta selección no corresponde a un proceso activo. Por favor, usa el comando /agregar-caso para empezar.',
+                        content='Esta selección no corresponde a un proceso activo. Por favor, usa el comando /cambios-devoluciones para empezar.',
                         view=None
                     )
                     state_manager.delete_user_state(user_id)
@@ -95,11 +95,11 @@ class InteractionSelects(commands.Cog):
             user_id = str(interaction.user.id)
             pending_data = state_manager.get_user_state(user_id)
             if pending_data and pending_data.get('type') == 'caso' and pending_data.get('paso') == 2 and pending_data.get('tipoSolicitud'):
-                modal = CasoModal()
+                modal = CambioDevolucionModal()
                 await interaction.response.send_modal(modal)
             else:
                 await interaction.response.edit_message(
-                    content='Este botón no corresponde a un proceso activo. Por favor, usa el comando /agregar-caso para empezar.',
+                    content='Este botón no corresponde a un proceso activo. Por favor, usa el comando /cambios-devoluciones para empezar.',
                     view=None
                 )
                 state_manager.delete_user_state(user_id)
