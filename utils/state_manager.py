@@ -29,22 +29,29 @@ def _write_pending_data(data):
         print("Error escribiendo en el archivo de estado:", error)
         raise
 
-# Guarda los datos de un usuario específico
-def set_user_state(user_id: str, user_data: dict):
+# Guarda los datos de un usuario específico y tipo
+# set_user_state(user_id, user_data, tipo)
+def set_user_state(user_id: str, user_data: dict, tipo: str):
     all_data = _read_pending_data()
-    all_data[user_id] = user_data
+    if user_id not in all_data:
+        all_data[user_id] = {}
+    all_data[user_id][tipo] = user_data
     _write_pending_data(all_data)
 
-# Obtiene los datos de un usuario específico
-def get_user_state(user_id: str):
+# Obtiene los datos de un usuario específico y tipo
+# get_user_state(user_id, tipo)
+def get_user_state(user_id: str, tipo: str):
     all_data = _read_pending_data()
-    return all_data.get(user_id, None)
+    return all_data.get(user_id, {}).get(tipo, None)
 
-# Elimina los datos de un usuario específico
-def delete_user_state(user_id: str):
+# Elimina los datos de un usuario específico y tipo
+# delete_user_state(user_id, tipo)
+def delete_user_state(user_id: str, tipo: str):
     all_data = _read_pending_data()
-    if user_id in all_data:
-        del all_data[user_id]
+    if user_id in all_data and tipo in all_data[user_id]:
+        del all_data[user_id][tipo]
+        if not all_data[user_id]:
+            del all_data[user_id]
         _write_pending_data(all_data)
 
 def funcion_state_manager():
