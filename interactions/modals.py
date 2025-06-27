@@ -541,7 +541,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             except:
                 pass
         # Borrar el mensaje de "Procesando..." tras 5 segundos
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
         try:
             await msg.delete()
         except Exception:
