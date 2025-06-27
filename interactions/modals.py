@@ -632,10 +632,11 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
                 numero_caso,      # D - Número de Caso
                 tipo_solicitud,   # E - Tipo de Solicitud
                 direccion_telefono, # F - Dirección/Teléfono/Datos
-                '',               # G - Referencia (Back Office)
-                'Nadie',          # H - Agente Back
-                'No',             # I - Resuelto
-                observaciones     # J - Observaciones
+                '',               # G - ZECO (ENTREGAR) / ANDRENAI OBLIGATORIO
+                '',               # H - Referencia (Back Office)
+                'Nadie',          # I - Agente Back
+                'No',             # J - Resuelto
+                observaciones     # K - Observaciones
             ]
             # Ajustar la cantidad de columnas al header
             if len(row_data) < len(header):
