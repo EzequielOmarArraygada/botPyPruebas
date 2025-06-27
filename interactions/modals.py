@@ -538,10 +538,20 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 except Exception as e:
                     print(f'[FINALIZAR TAREA] ❌ Error al editar el mensaje original: {e}')
             
-            # 7. Enviar confirmación al usuario
+            # 7. Enviar confirmación pública al canal y borrarla después de 1 minuto
+            canal_confirm = None
+            if channel_id:
+                canal_confirm = interaction.guild.get_channel(int(channel_id))
+            if canal_confirm:
+                msg_pub = await canal_confirm.send(f'✅ La tarea de {interaction.user.mention} fue finalizada correctamente.')
+                await asyncio.sleep(60)
+                try:
+                    await msg_pub.delete()
+                except:
+                    pass
+            # Solo enviar confirmación privada si no se pudo actualizar el embed
             if not confirmacion_enviada:
                 if not embed_actualizado:
-                    # Solo enviar confirmación si no se pudo actualizar el embed
                     await interaction.followup.send(
                         f'✅ **Tarea finalizada exitosamente**\n\n'
                         f'📋 **Detalles:**\n'
