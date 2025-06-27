@@ -442,6 +442,13 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
         self.add_item(self.cantidad)
 
     async def on_submit(self, interaction: discord.Interaction):
+        import asyncio
+        # 1. Responder inmediatamente al modal para evitar error visual
+        await interaction.response.send_message("Procesando la finalización de la tarea...", ephemeral=True)
+        # 2. Procesar la finalización en segundo plano
+        asyncio.create_task(self.procesar_finalizacion(interaction))
+
+    async def procesar_finalizacion(self, interaction):
         import config
         import utils.google_sheets as google_sheets
         from tasks.panel import crear_embed_tarea
@@ -449,45 +456,29 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
         from datetime import datetime
         import pytz
         import asyncio
-        
-        # Variable para controlar si se envió confirmación
-        confirmacion_enviada = False
-        
         try:
-            print(f'[FINALIZAR TAREA] Iniciando finalización de tarea {self.tarea_id} por usuario {interaction.user}')
-
-            
-            # 1. Obtener datos de la tarea
-            print(f'[FINALIZAR TAREA] Conectando a Google Sheets...')
+            # Validar credenciales y sheet id
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.followup.send('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                return
+            if not config.GOOGLE_SHEET_ID_TAREAS:
+                await interaction.followup.send('❌ Error: El ID de la hoja de tareas no está configurado.', ephemeral=True)
+                return
             client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
-            
             datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
                 await interaction.followup.send('❌ No se encontró la tarea especificada.', ephemeral=True)
-                confirmacion_enviada = True
                 return
-                
-            print(f'[FINALIZAR TAREA] Tarea encontrada: {datos_tarea["tarea"]}')
-            
-            # 2. Validar cantidad de casos
             cantidad = self.cantidad.value.strip()
             if not cantidad or not cantidad.isdigit():
                 await interaction.followup.send('❌ Debes ingresar una cantidad válida de casos gestionados.', ephemeral=True)
-                confirmacion_enviada = True
                 return
-                
-            print(f'[FINALIZAR TAREA] Cantidad de casos: {cantidad}')
-            
-            # 3. Obtener fecha de finalización
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_finalizacion = now.strftime('%d/%m/%Y %H:%M:%S')
-            
-            # 4. Finalizar tarea en Google Sheets (con reintentos)
-            print(f'[FINALIZAR TAREA] Guardando en Google Sheets...')
             max_intentos_sheet = 3
             for intento in range(max_intentos_sheet):
                 try:
@@ -499,18 +490,12 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                         fecha_finalizacion,
                         cantidad
                     )
-                    print(f'[FINALIZAR TAREA] ✅ Guardado exitoso en Google Sheets (intento {intento + 1})')
                     break
                 except Exception as e:
-                    print(f'[FINALIZAR TAREA] ❌ Error en intento {intento + 1}: {e}')
                     if intento == max_intentos_sheet - 1:
                         await interaction.followup.send(f'❌ Error al guardar en Google Sheets después de {max_intentos_sheet} intentos: {str(e)}', ephemeral=True)
-                        confirmacion_enviada = True
                         return
-                    await asyncio.sleep(1)  # Esperar 1 segundo antes del reintento
-            
-            # 5. Crear el embed actualizado con estado finalizado y cantidad de casos
-            print(f'[FINALIZAR TAREA] Creando embed actualizado...')
+                    await asyncio.sleep(1)
             embed = crear_embed_tarea(
                 interaction.user,
                 datos_tarea['tarea'],
@@ -521,37 +506,19 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 cantidad_casos=cantidad
             )
             embed.color = discord.Color.red()
-            
-            # Crear una nueva view sin botones para tareas finalizadas
             view = discord.ui.View(timeout=None)
-            
-            # 6. Buscar y actualizar el mensaje original de la tarea
-            print(f'[FINALIZAR TAREA] Buscando mensaje original...')
             user_id = str(interaction.user.id)
             estado = get_user_state(user_id, "tarea")
-            if not estado:
-                await interaction.followup.send(
-                    "❌ No se encontró el estado de la tarea para este usuario. Es posible que la tarea no se haya iniciado correctamente o que el estado se haya perdido.\n\n"
-                    "Por favor, verifica en Google Sheets si la tarea fue registrada y vuelve a intentarlo.",
-                    ephemeral=True
-                )
-                return
-            message_id = estado.get('message_id')
-            channel_id = estado.get('channel_id')
-            
-            embed_actualizado = False
+            message_id = estado.get('message_id') if estado else None
+            channel_id = estado.get('channel_id') if estado else None
             if message_id and channel_id:
                 try:
                     canal = interaction.guild.get_channel(int(channel_id))
                     if canal:
                         mensaje = await canal.fetch_message(int(message_id))
                         await mensaje.edit(embed=embed, view=view)
-                        embed_actualizado = True
-                        print(f'[FINALIZAR TAREA] ✅ Mensaje original actualizado exitosamente')
                 except Exception as e:
-                    print(f'[FINALIZAR TAREA] ❌ Error al editar el mensaje original: {e}')
-            
-            # 7. Enviar confirmación pública al canal y borrarla después de 1 minuto
+                    pass
             canal_confirm = None
             if channel_id:
                 canal_confirm = interaction.guild.get_channel(int(channel_id))
@@ -562,55 +529,18 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                     await msg_pub.delete()
                 except:
                     pass
-            # Solo enviar confirmación privada si no se pudo actualizar el embed
-            if not confirmacion_enviada:
-                if not embed_actualizado:
-                    await interaction.followup.send(
-                        f'✅ **Tarea finalizada exitosamente**\n\n'
-                        f'📋 **Detalles:**\n'
-                        f'• **Tarea:** {datos_tarea["tarea"]}\n'
-                        f'• **Casos gestionados:** {cantidad}\n'
-                        f'• **Fecha de finalización:** {fecha_finalizacion}\n'
-                        f'• **Estado:** Finalizada\n\n'
-                        f'⚠️ **Nota:** La tarea se guardó correctamente en Google Sheets, pero no se pudo actualizar el embed visual.',
-                        ephemeral=True
-                    )
-                confirmacion_enviada = True
-            # Siempre responder al interaction para evitar que quede pensando
-            print("DEBUG: Antes del followup")
-            if not interaction.response.is_done():
-                await interaction.followup.send('✅ Tarea finalizada.', ephemeral=True)
-            print("DEBUG: Después del followup")
-            
-            print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente')
-            
-            # Cuando corresponda borrar el estado:
             delete_user_state(user_id, "tarea")
-            
         except Exception as e:
-            print(f'[FINALIZAR TAREA] ❌ ERROR CRÍTICO: {e}')
-            
-            # Garantizar que el usuario reciba una respuesta
-            if not confirmacion_enviada:
-                try:
-                    await interaction.followup.send(
-                        f'❌ **Error al finalizar la tarea**\n\n'
-                        f'Se produjo un error inesperado: `{str(e)}`\n\n'
-                        f'⚠️ **Recomendación:** Verifica en Google Sheets si la tarea se guardó correctamente. '
-                        f'Si no se guardó, intenta finalizar nuevamente.',
-                        ephemeral=True
-                    )
-                except:
-                    # Si incluso esto falla, intentar con response directo
-                    try:
-                        await interaction.response.send_message(
-                            f'❌ Error crítico al finalizar la tarea: {str(e)}',
-                            ephemeral=True
-                        )
-                    except:
-                        print(f'[FINALIZAR TAREA] ❌ ERROR FATAL: No se pudo enviar ninguna confirmación al usuario')
-            if not interaction.response.is_done():
-                await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
+            try:
+                await interaction.followup.send(
+                    f'❌ **Error al finalizar la tarea**\n\n'
+                    f'Se produjo un error inesperado: `{str(e)}`\n\n'
+                    f'⚠️ **Recomendación:** Verifica en Google Sheets si la tarea se guardó correctamente. '
+                    f'Si no se guardó, intenta finalizar nuevamente.',
+                    ephemeral=True
+                )
+            except:
+                pass
 
 class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de Envío'):
     def __init__(self):
