@@ -685,7 +685,7 @@ class IniciarSolicitudesEnviosButton(discord.ui.Button):
                 await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
                 return
             from utils.state_manager import set_user_state
-            set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1})
+            set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1}, "solicitudes_envios")
             from interactions.select_menus import build_tipo_solicitud_envios_menu
             view = build_tipo_solicitud_envios_menu()
             await interaction.response.send_message('Por favor, selecciona el tipo de solicitud de envío:', view=view, ephemeral=True)
@@ -807,7 +807,7 @@ class IniciarReembolsosButton(discord.ui.Button):
                 await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
                 return
             from utils.state_manager import set_user_state
-            set_user_state(str(interaction.user.id), {"type": "reembolsos", "paso": 1})
+            set_user_state(str(interaction.user.id), {"type": "reembolsos", "paso": 1}, "reembolsos")
             from interactions.select_menus import build_tipo_reembolso_menu
             view = build_tipo_reembolso_menu()
             await interaction.response.send_message('Por favor, selecciona el tipo de reembolso:', view=view, ephemeral=True)
