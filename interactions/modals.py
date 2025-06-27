@@ -439,30 +439,71 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
         from tasks.panel import crear_embed_tarea
         from datetime import datetime
         import pytz
+        import asyncio
+        
+        # Variable para controlar si se envió confirmación
+        confirmacion_enviada = False
+        
         try:
+            print(f'[FINALIZAR TAREA] Iniciando finalización de tarea {self.tarea_id} por usuario {interaction.user}')
+            
+            # Deferir respuesta para evitar timeout
+            await interaction.response.defer(thinking=True)
+            
+            # 1. Obtener datos de la tarea
+            print(f'[FINALIZAR TAREA] Conectando a Google Sheets...')
             client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
+            
             datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
-                await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
+                await interaction.followup.send('❌ No se encontró la tarea especificada.', ephemeral=True)
+                confirmacion_enviada = True
                 return
+                
+            print(f'[FINALIZAR TAREA] Tarea encontrada: {datos_tarea["tarea"]}')
+            
+            # 2. Validar cantidad de casos
             cantidad = self.cantidad.value.strip()
-            # Obtener fecha de finalización
+            if not cantidad or not cantidad.isdigit():
+                await interaction.followup.send('❌ Debes ingresar una cantidad válida de casos gestionados.', ephemeral=True)
+                confirmacion_enviada = True
+                return
+                
+            print(f'[FINALIZAR TAREA] Cantidad de casos: {cantidad}')
+            
+            # 3. Obtener fecha de finalización
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_finalizacion = now.strftime('%d/%m/%Y %H:%M:%S')
-            # Finalizar tarea en Google Sheets (con cantidad de casos)
-            google_sheets.finalizar_tarea_por_id_con_cantidad(
-                sheet_activas,
-                sheet_historial,
-                self.tarea_id,
-                str(interaction.user),
-                fecha_finalizacion,
-                cantidad
-            )
-            # Actualizar el embed con estado finalizado y cantidad de casos
+            
+            # 4. Finalizar tarea en Google Sheets (con reintentos)
+            print(f'[FINALIZAR TAREA] Guardando en Google Sheets...')
+            max_intentos_sheet = 3
+            for intento in range(max_intentos_sheet):
+                try:
+                    google_sheets.finalizar_tarea_por_id_con_cantidad(
+                        sheet_activas,
+                        sheet_historial,
+                        self.tarea_id,
+                        str(interaction.user),
+                        fecha_finalizacion,
+                        cantidad
+                    )
+                    print(f'[FINALIZAR TAREA] ✅ Guardado exitoso en Google Sheets (intento {intento + 1})')
+                    break
+                except Exception as e:
+                    print(f'[FINALIZAR TAREA] ❌ Error en intento {intento + 1}: {e}')
+                    if intento == max_intentos_sheet - 1:
+                        await interaction.followup.send(f'❌ Error al guardar en Google Sheets después de {max_intentos_sheet} intentos: {str(e)}', ephemeral=True)
+                        confirmacion_enviada = True
+                        return
+                    await asyncio.sleep(1)  # Esperar 1 segundo antes del reintento
+            
+            # 5. Actualizar el embed con estado finalizado y cantidad de casos
+            print(f'[FINALIZAR TAREA] Creando embed actualizado...')
             embed = crear_embed_tarea(
                 interaction.user,
                 datos_tarea['tarea'],
@@ -473,18 +514,80 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 cantidad_casos=cantidad
             )
             embed.color = discord.Color.red()
+            
             # Crear una nueva view sin botones para tareas finalizadas
             view = discord.ui.View(timeout=None)
-            # Editar el mensaje original (el del canal de registro)
-            try:
-                await interaction.response.edit_message(embed=embed, view=view)
-            except Exception as e:
-                # Si no se puede editar el mensaje original, enviar un mensaje de confirmación
-                await interaction.response.send_message('✅ Tarea finalizada y registrada correctamente.', ephemeral=True)
+            
+            # 6. Intentar editar el mensaje original con reintentos
+            print(f'[FINALIZAR TAREA] Intentando actualizar embed...')
+            max_intentos_embed = 3
+            embed_actualizado = False
+            
+            for intento in range(max_intentos_embed):
+                try:
+                    await interaction.edit_original_response(embed=embed, view=view)
+                    print(f'[FINALIZAR TAREA] ✅ Embed actualizado exitosamente (intento {intento + 1})')
+                    embed_actualizado = True
+                    break
+                except Exception as e:
+                    print(f'[FINALIZAR TAREA] ❌ Error al actualizar embed (intento {intento + 1}): {e}')
+                    if intento < max_intentos_embed - 1:
+                        await asyncio.sleep(2)  # Esperar 2 segundos antes del reintento
+                    else:
+                        print(f'[FINALIZAR TAREA] ⚠️ No se pudo actualizar el embed después de {max_intentos_embed} intentos')
+            
+            # 7. Garantizar confirmación al usuario
+            if not confirmacion_enviada:
+                if embed_actualizado:
+                    # Si el embed se actualizó, enviar confirmación adicional
+                    await interaction.followup.send(
+                        f'✅ **Tarea finalizada exitosamente**\n\n'
+                        f'📋 **Detalles:**\n'
+                        f'• **Tarea:** {datos_tarea["tarea"]}\n'
+                        f'• **Casos gestionados:** {cantidad}\n'
+                        f'• **Fecha de finalización:** {fecha_finalizacion}\n'
+                        f'• **Estado:** Finalizada\n\n'
+                        f'La tarea ha sido registrada en Google Sheets y el embed ha sido actualizado.',
+                        ephemeral=True
+                    )
+                else:
+                    # Si no se pudo actualizar el embed, enviar confirmación principal
+                    await interaction.followup.send(
+                        f'✅ **Tarea finalizada exitosamente**\n\n'
+                        f'📋 **Detalles:**\n'
+                        f'• **Tarea:** {datos_tarea["tarea"]}\n'
+                        f'• **Casos gestionados:** {cantidad}\n'
+                        f'• **Fecha de finalización:** {fecha_finalizacion}\n'
+                        f'• **Estado:** Finalizada\n\n'
+                        f'⚠️ **Nota:** La tarea se guardó correctamente en Google Sheets, pero no se pudo actualizar el embed visual.',
+                        ephemeral=True
+                    )
+                confirmacion_enviada = True
+                
+            print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente')
+            
         except Exception as e:
-            print(f'Error al finalizar tarea con cantidad de casos: {e}')
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
+            print(f'[FINALIZAR TAREA] ❌ ERROR CRÍTICO: {e}')
+            
+            # Garantizar que el usuario reciba una respuesta
+            if not confirmacion_enviada:
+                try:
+                    await interaction.followup.send(
+                        f'❌ **Error al finalizar la tarea**\n\n'
+                        f'Se produjo un error inesperado: `{str(e)}`\n\n'
+                        f'⚠️ **Recomendación:** Verifica en Google Sheets si la tarea se guardó correctamente. '
+                        f'Si no se guardó, intenta finalizar nuevamente.',
+                        ephemeral=True
+                    )
+                except:
+                    # Si incluso esto falla, intentar con response directo
+                    try:
+                        await interaction.response.send_message(
+                            f'❌ Error crítico al finalizar la tarea: {str(e)}',
+                            ephemeral=True
+                        )
+                    except:
+                        print(f'[FINALIZAR TAREA] ❌ ERROR FATAL: No se pudo enviar ninguna confirmación al usuario')
 
 class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de Envío'):
     def __init__(self):
