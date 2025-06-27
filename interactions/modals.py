@@ -443,12 +443,11 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
 
     async def on_submit(self, interaction: discord.Interaction):
         import asyncio
-        # 1. Responder inmediatamente al modal para evitar error visual
-        await interaction.response.send_message("Procesando la finalización de la tarea...", ephemeral=True)
-        # 2. Procesar la finalización en segundo plano
-        asyncio.create_task(self.procesar_finalizacion(interaction))
+        await interaction.response.send_message("Procesando la finalización de la tarea...", ephemeral=False)
+        msg = await interaction.original_response()
+        asyncio.create_task(self.procesar_finalizacion(interaction, msg))
 
-    async def procesar_finalizacion(self, interaction):
+    async def procesar_finalizacion(self, interaction, msg):
         import config
         import utils.google_sheets as google_sheets
         from tasks.panel import crear_embed_tarea
@@ -541,6 +540,12 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 )
             except:
                 pass
+        # Borrar el mensaje de "Procesando..." tras 5 segundos
+        await asyncio.sleep(5)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
 
 class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de Envío'):
     def __init__(self):
