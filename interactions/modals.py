@@ -455,9 +455,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
         
         try:
             print(f'[FINALIZAR TAREA] Iniciando finalización de tarea {self.tarea_id} por usuario {interaction.user}')
-            
-            # Deferir respuesta para evitar timeout
-            await interaction.response.defer(thinking=True)
+
             
             # 1. Obtener datos de la tarea
             print(f'[FINALIZAR TAREA] Conectando a Google Sheets...')
