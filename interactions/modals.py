@@ -765,52 +765,24 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
             agente_name = interaction.user.display_name
             
-            # Construir la fila según el header
+            # Construir diccionario de datos a guardar
+            datos = {
+                'Número de pedido': pedido,
+                'ZRE2 / ZRE4': zre,
+                'Tarjeta': tarjeta,
+                'Correo del cliente': correo,
+                'Motivo de reembolso': motivo_reembolso,
+                'Observación adicional': observacion,
+                'Agente (Front)': agente_name,
+                'Fecha de compra': fecha_hora,
+                'Agente (Back/TL)': 'Nadie',
+            }
+            # Armar la fila final según el header
             header = rows[0] if rows else []
-            row_data = [
-                pedido,           # A - Número de Pedido
-                zre,              # B - ZRE2 / ZRE4
-                tarjeta,          # C - Tarjeta
-                correo,           # D - Correo del Cliente
-                motivo_reembolso, # E - Motivo de Reembolso
-                observacion,      # F - Observación Adicional
-                agente_name,      # G - Agente (Front)
-                fecha_hora,       # H - Fecha de Compra
-                'Nadie'           # I - Agente (Back/TL)
-            ]
-            
-            # Ajustar la cantidad de columnas al header
-            if len(row_data) < len(header):
-                row_data += [''] * (len(header) - len(row_data))
-            elif len(row_data) > len(header):
-                row_data = row_data[:len(header)]
-            
-            # Mapear campos a columnas específicas por nombre
-            def normaliza_columna(nombre):
-                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
-            
-            # Buscar índices de columnas específicas
-            idx_agente_front = None
-            idx_fecha_compra = None
-            idx_agente_back = None
-            
-            for idx, col_name in enumerate(header):
-                norm = normaliza_columna(col_name)
-                if norm == normaliza_columna('Agente (Front)'):
-                    idx_agente_front = idx
-                elif norm == normaliza_columna('Fecha de Compra'):
-                    idx_fecha_compra = idx
-                elif norm == normaliza_columna('Agente (Back/TL)'):
-                    idx_agente_back = idx
-            
-            # Asignar valores a las columnas específicas
-            if idx_agente_front is not None:
-                row_data[idx_agente_front] = agente_name
-            if idx_fecha_compra is not None:
-                row_data[idx_fecha_compra] = fecha_hora
-            if idx_agente_back is not None:
-                row_data[idx_agente_back] = 'Nadie'
-            
+            row_data = []
+            for col in header:
+                valor = datos.get(col, '')
+                row_data.append(valor)
             sheet.append_row(row_data)
             confirmation_message = f"""✅ **Reembolso registrado exitosamente**\n\n📋 **Detalles del reembolso:**\n• **N° de Pedido:** {pedido}\n• **ZRE2/ZRE4:** {zre}\n• **Tarjeta:** {tarjeta}\n• **Correo:** {correo}\n• **Motivo:** {motivo_reembolso}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n"""
             if observacion:
