@@ -529,11 +529,7 @@ class FacturaAButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
-                    # Primero enviar la respuesta exitosa
-                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                    # Luego enviar el mensaje al canal
                     msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
-                    # Borrar el mensaje después de 2 minutos
                     await asyncio.sleep(120)
                     try:
                         await msg.delete()
@@ -559,11 +555,7 @@ class CambiosDevolucionesButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
-                    # Primero enviar la respuesta exitosa
-                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                    # Luego enviar el mensaje al canal
                     msg = await canal.send(f'🔄 {interaction.user.mention}, haz clic en el botón para iniciar el registro de Cambios/Devoluciones:', view=IniciarCambiosDevolucionesView(interaction.user.id))
-                    # Borrar el mensaje después de 2 minutos
                     await asyncio.sleep(120)
                     try:
                         await msg.delete()
@@ -612,11 +604,7 @@ class SolicitudesEnviosButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
-                    # Primero enviar la respuesta exitosa
-                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                    # Luego enviar el mensaje al canal
                     msg = await canal.send(f'🚚 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de envío:', view=IniciarSolicitudesEnviosView(interaction.user.id))
-                    # Borrar el mensaje después de 2 minutos
                     await asyncio.sleep(120)
                     try:
                         await msg.delete()
@@ -665,11 +653,7 @@ class TrackingButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
-                    # Primero enviar la respuesta exitosa
-                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                    # Luego enviar el mensaje al canal
                     msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para consultar el estado de un envío:', view=IniciarTrackingView(interaction.user.id))
-                    # Borrar el mensaje después de 2 minutos
                     await asyncio.sleep(120)
                     try:
                         await msg.delete()
@@ -695,11 +679,7 @@ class BuscarCasoButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
-                    # Primero enviar la respuesta exitosa
-                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                    # Luego enviar el mensaje al canal
                     msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para buscar un caso:', view=IniciarBuscarCasoView(interaction.user.id))
-                    # Borrar el mensaje después de 2 minutos
                     await asyncio.sleep(120)
                     try:
                         await msg.delete()
