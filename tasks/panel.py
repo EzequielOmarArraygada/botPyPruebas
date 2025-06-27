@@ -629,7 +629,7 @@ class IniciarCambiosDevolucionesButton(discord.ui.Button):
                 await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
                 return
             from utils.state_manager import set_user_state
-            set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1})
+            set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1}, "cambios_devoluciones")
             from interactions.select_menus import build_tipo_solicitud_select_menu
             view = build_tipo_solicitud_select_menu()
             await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
