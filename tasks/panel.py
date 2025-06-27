@@ -450,10 +450,13 @@ class PanelComandosView(discord.ui.View):
         self.add_item(BuscarCasoButton())
 
 def safe_int(val):
+    """Convierte un valor a entero de forma segura, retornando 0 si no es posible"""
+    if val is None:
+        return 0
     try:
         return int(val)
-    except (TypeError, ValueError):
-        return None
+    except (ValueError, TypeError):
+        return 0
 
 # --- VIEWS PARA INICIAR FLUJOS EN EL CANAL CORRECTO ---
 class IniciarFacturaAView(discord.ui.View):
@@ -463,14 +466,18 @@ class IniciarFacturaAView(discord.ui.View):
 
 class IniciarFacturaAButton(discord.ui.Button):
     def __init__(self, user_id):
-        super().__init__(label='Iniciar Factura A', style=discord.ButtonStyle.success, custom_id=f'init_factura_a_{user_id}')
+        super().__init__(label='Iniciar solicitud de Factura A', style=discord.ButtonStyle.primary, custom_id=f'init_factura_a_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
-        if str(interaction.user.id) != str(self.user_id):
-            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
-            return
-        from interactions.modals import FacturaAModal
-        await interaction.response.send_modal(FacturaAModal())
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from interactions.modals import FacturaAModal
+            await interaction.response.send_modal(FacturaAModal())
+        except Exception as e:
+            print(f'Error en IniciarFacturaAButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class IniciarTrackingView(discord.ui.View):
     def __init__(self, user_id):
@@ -482,11 +489,15 @@ class IniciarTrackingButton(discord.ui.Button):
         super().__init__(label='Iniciar consulta de tracking', style=discord.ButtonStyle.primary, custom_id=f'init_tracking_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
-        if str(interaction.user.id) != str(self.user_id):
-            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
-            return
-        from interactions.modals import TrackingModal
-        await interaction.response.send_modal(TrackingModal())
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from interactions.modals import TrackingModal
+            await interaction.response.send_modal(TrackingModal())
+        except Exception as e:
+            print(f'Error en IniciarTrackingButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class IniciarBuscarCasoView(discord.ui.View):
     def __init__(self, user_id):
@@ -498,55 +509,67 @@ class IniciarBuscarCasoButton(discord.ui.Button):
         super().__init__(label='Iniciar búsqueda de caso', style=discord.ButtonStyle.primary, custom_id=f'init_buscar_caso_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
-        if str(interaction.user.id) != str(self.user_id):
-            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
-            return
-        from interactions.modals import BuscarCasoModal
-        await interaction.response.send_modal(BuscarCasoModal())
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from interactions.modals import BuscarCasoModal
+            await interaction.response.send_modal(BuscarCasoModal())
+        except Exception as e:
+            print(f'Error en IniciarBuscarCasoButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class FacturaAButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Factura A', emoji='🧾', style=discord.ButtonStyle.success, custom_id='panel_factura_a')
     async def callback(self, interaction: discord.Interaction):
-        from config import TARGET_CHANNEL_ID_FAC_A
-        canal_id = safe_int(TARGET_CHANNEL_ID_FAC_A)
-        if canal_id:
-            canal = interaction.guild.get_channel(canal_id)
-            if canal:
-                msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
-                await asyncio.sleep(120)
-                try:
-                    await msg.delete()
-                except:
-                    pass
-                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                return
+        try:
+            from config import TARGET_CHANNEL_ID_FAC_A
+            canal_id = safe_int(TARGET_CHANNEL_ID_FAC_A)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
+                    await asyncio.sleep(120)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Factura A.', ephemeral=True)
             else:
-                await interaction.response.send_message('No se encontró el canal de Factura A.', ephemeral=True)
-        else:
-            await interaction.response.send_message('No se configuró el canal de Factura A.', ephemeral=True)
+                await interaction.response.send_message('No se configuró el canal de Factura A.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en FacturaAButton: {e}')
+            await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class CambiosDevolucionesButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Cambios/Devoluciones', emoji='🔄', style=discord.ButtonStyle.success, custom_id='panel_cambios_devoluciones')
     async def callback(self, interaction: discord.Interaction):
-        from config import TARGET_CHANNEL_ID_CASOS
-        canal_id = safe_int(TARGET_CHANNEL_ID_CASOS)
-        if canal_id:
-            canal = interaction.guild.get_channel(canal_id)
-            if canal:
-                msg = await canal.send(f'🔄 {interaction.user.mention}, haz clic en el botón para iniciar el registro de Cambios/Devoluciones:', view=IniciarCambiosDevolucionesView(interaction.user.id))
-                await asyncio.sleep(120)
-                try:
-                    await msg.delete()
-                except:
-                    pass
-                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                return
+        try:
+            from config import TARGET_CHANNEL_ID_CASOS
+            canal_id = safe_int(TARGET_CHANNEL_ID_CASOS)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    msg = await canal.send(f'🔄 {interaction.user.mention}, haz clic en el botón para iniciar el registro de Cambios/Devoluciones:', view=IniciarCambiosDevolucionesView(interaction.user.id))
+                    await asyncio.sleep(120)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Cambios/Devoluciones.', ephemeral=True)
             else:
-                await interaction.response.send_message('No se encontró el canal de Cambios/Devoluciones.', ephemeral=True)
-        else:
-            await interaction.response.send_message('No se configuró el canal de Cambios/Devoluciones.', ephemeral=True)
+                await interaction.response.send_message('No se configuró el canal de Cambios/Devoluciones.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en CambiosDevolucionesButton: {e}')
+            await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class IniciarCambiosDevolucionesView(discord.ui.View):
     def __init__(self, user_id):
@@ -558,36 +581,44 @@ class IniciarCambiosDevolucionesButton(discord.ui.Button):
         super().__init__(label='Iniciar registro de Cambios/Devoluciones', style=discord.ButtonStyle.success, custom_id=f'init_cambios_devoluciones_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
-        if str(interaction.user.id) != str(self.user_id):
-            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
-            return
-        from utils.state_manager import set_user_state
-        set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1})
-        from interactions.select_menus import build_tipo_solicitud_select_menu
-        view = build_tipo_solicitud_select_menu()
-        await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from utils.state_manager import set_user_state
+            set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1})
+            from interactions.select_menus import build_tipo_solicitud_select_menu
+            view = build_tipo_solicitud_select_menu()
+            await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
+        except Exception as e:
+            print(f'Error en IniciarCambiosDevolucionesButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class SolicitudesEnviosButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Solicitudes de Envíos', emoji='🚚', style=discord.ButtonStyle.primary, custom_id='panel_solicitudes_envios')
     async def callback(self, interaction: discord.Interaction):
-        from config import TARGET_CHANNEL_ID_CASOS_ENVIOS
-        canal_id = safe_int(TARGET_CHANNEL_ID_CASOS_ENVIOS)
-        if canal_id:
-            canal = interaction.guild.get_channel(canal_id)
-            if canal:
-                msg = await canal.send(f'🚚 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de envío:', view=IniciarSolicitudesEnviosView(interaction.user.id))
-                await asyncio.sleep(120)
-                try:
-                    await msg.delete()
-                except:
-                    pass
-                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                return
+        try:
+            from config import TARGET_CHANNEL_ID_CASOS_ENVIOS
+            canal_id = safe_int(TARGET_CHANNEL_ID_CASOS_ENVIOS)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    msg = await canal.send(f'🚚 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de envío:', view=IniciarSolicitudesEnviosView(interaction.user.id))
+                    await asyncio.sleep(120)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Solicitudes de Envíos.', ephemeral=True)
             else:
-                await interaction.response.send_message('No se encontró el canal de Solicitudes de Envíos.', ephemeral=True)
-        else:
-            await interaction.response.send_message('No se configuró el canal de Solicitudes de Envíos.', ephemeral=True)
+                await interaction.response.send_message('No se configuró el canal de Solicitudes de Envíos.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en SolicitudesEnviosButton: {e}')
+            await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class IniciarSolicitudesEnviosView(discord.ui.View):
     def __init__(self, user_id):
@@ -599,58 +630,70 @@ class IniciarSolicitudesEnviosButton(discord.ui.Button):
         super().__init__(label='Iniciar solicitud de envío', style=discord.ButtonStyle.primary, custom_id=f'init_solicitudes_envios_{user_id}')
         self.user_id = user_id
     async def callback(self, interaction: discord.Interaction):
-        if str(interaction.user.id) != str(self.user_id):
-            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
-            return
-        from utils.state_manager import set_user_state
-        set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1})
-        from interactions.select_menus import build_tipo_solicitud_envios_menu
-        view = build_tipo_solicitud_envios_menu()
-        await interaction.response.send_message('Por favor, selecciona el tipo de solicitud de envío:', view=view, ephemeral=True)
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from utils.state_manager import set_user_state
+            set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1})
+            from interactions.select_menus import build_tipo_solicitud_envios_menu
+            view = build_tipo_solicitud_envios_menu()
+            await interaction.response.send_message('Por favor, selecciona el tipo de solicitud de envío:', view=view, ephemeral=True)
+        except Exception as e:
+            print(f'Error en IniciarSolicitudesEnviosButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class TrackingButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Tracking', emoji='📦', style=discord.ButtonStyle.secondary, custom_id='panel_tracking')
     async def callback(self, interaction: discord.Interaction):
-        from config import TARGET_CHANNEL_ID_ENVIOS
-        canal_id = safe_int(TARGET_CHANNEL_ID_ENVIOS)
-        if canal_id:
-            canal = interaction.guild.get_channel(canal_id)
-            if canal:
-                msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para consultar el estado de un envío:', view=IniciarTrackingView(interaction.user.id))
-                await asyncio.sleep(120)
-                try:
-                    await msg.delete()
-                except:
-                    pass
-                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                return
+        try:
+            from config import TARGET_CHANNEL_ID_ENVIOS
+            canal_id = safe_int(TARGET_CHANNEL_ID_ENVIOS)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para consultar el estado de un envío:', view=IniciarTrackingView(interaction.user.id))
+                    await asyncio.sleep(120)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Envíos.', ephemeral=True)
             else:
-                await interaction.response.send_message('No se encontró el canal de Envíos.', ephemeral=True)
-        else:
-            await interaction.response.send_message('No se configuró el canal de Envíos.', ephemeral=True)
+                await interaction.response.send_message('No se configuró el canal de Envíos.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en TrackingButton: {e}')
+            await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class BuscarCasoButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Buscar caso', emoji='🔍', style=discord.ButtonStyle.secondary, custom_id='panel_buscar_caso')
     async def callback(self, interaction: discord.Interaction):
-        from config import TARGET_CHANNEL_ID_BUSCAR_CASO
-        canal_id = safe_int(TARGET_CHANNEL_ID_BUSCAR_CASO)
-        if canal_id:
-            canal = interaction.guild.get_channel(canal_id)
-            if canal:
-                msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para buscar un caso:', view=IniciarBuscarCasoView(interaction.user.id))
-                await asyncio.sleep(120)
-                try:
-                    await msg.delete()
-                except:
-                    pass
-                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
-                return
+        try:
+            from config import TARGET_CHANNEL_ID_BUSCAR_CASO
+            canal_id = safe_int(TARGET_CHANNEL_ID_BUSCAR_CASO)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para buscar un caso:', view=IniciarBuscarCasoView(interaction.user.id))
+                    await asyncio.sleep(120)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Búsqueda de Casos.', ephemeral=True)
             else:
-                await interaction.response.send_message('No se encontró el canal de Búsqueda de Casos.', ephemeral=True)
-        else:
-            await interaction.response.send_message('No se configuró el canal de Búsqueda de Casos.', ephemeral=True)
+                await interaction.response.send_message('No se configuró el canal de Búsqueda de Casos.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en BuscarCasoButton: {e}')
+            await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class PanelComandos(commands.Cog):
     def __init__(self, bot):

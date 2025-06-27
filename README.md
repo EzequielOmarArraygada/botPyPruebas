@@ -171,4 +171,116 @@ python redeploy.py
 - google-api-python-client - Cliente de Google APIs
 - requests - Cliente HTTP
 - pytz - Manejo de zonas horarias
-- google-generativeai - API de Gemini AI 
+- google-generativeai - API de Gemini AI
+
+## Configuración de Variables de Entorno
+
+### Variables Requeridas
+```env
+# Discord
+DISCORD_TOKEN=tu_token_de_discord
+GUILD_ID=id_del_servidor
+
+# Google Services
+GOOGLE_CREDENTIALS_JSON={"tu":"json_de_credenciales"}
+
+# IDs de Canales (Obligatorios para el panel de comandos)
+TARGET_CHANNEL_ID_FAC_A=id_canal_factura_a
+TARGET_CHANNEL_ID_ENVIOS=id_canal_envios
+TARGET_CHANNEL_ID_CASOS=id_canal_casos
+TARGET_CHANNEL_ID_CASOS_ENVIOS=id_canal_solicitudes_envios
+TARGET_CHANNEL_ID_BUSCAR_CASO=id_canal_buscar_caso
+TARGET_CHANNEL_ID_TAREAS=id_canal_tareas
+TARGET_CHANNEL_ID_TAREAS_REGISTRO=id_canal_registro_tareas
+TARGET_CHANNEL_ID_GUIA_COMANDOS=id_canal_guia_comandos
+
+# Google Sheets IDs
+GOOGLE_SHEET_ID_FAC_A=id_hoja_factura_a
+GOOGLE_SHEET_ID_CASOS=id_hoja_casos
+GOOGLE_SHEET_ID_TAREAS=id_hoja_tareas
+GOOGLE_SHEET_SEARCH_SHEET_ID=id_hoja_busqueda
+
+# API de Andreani
+ANDREANI_API_AUTH=tu_header_de_autenticacion
+
+# Gemini AI (Opcional)
+GEMINI_API_KEY=tu_api_key_gemini
+MANUAL_DRIVE_FILE_ID=id_archivo_manual
+```
+
+### Variables Opcionales
+```env
+# Categoría objetivo para comandos
+TARGET_CATEGORY_ID=id_categoria
+
+# Intervalo de verificación de errores (en milisegundos, por defecto 4 horas)
+ERROR_CHECK_INTERVAL_MS=14400000
+
+# Canales de ayuda
+HELP_CHANNEL_ID=id_canal_ayuda
+```
+
+## Panel de Comandos
+
+### Configuración Requerida
+Para que el panel de comandos funcione correctamente, asegúrate de configurar todas las variables de canal:
+
+1. **TARGET_CHANNEL_ID_CASOS_ENVIOS**: Canal para solicitudes de envíos (cambio de dirección, reenvío, etc.)
+2. **TARGET_CHANNEL_ID_GUIA_COMANDOS**: Canal donde se publicará el panel de comandos
+
+### Comandos del Panel
+- **Factura A**: Inicia solicitud de facturación tipo A
+- **Cambios/Devoluciones**: Registra casos de cambios o devoluciones
+- **Solicitudes de Envíos**: Maneja solicitudes sobre envíos (cambio de dirección, reenvío, etc.)
+- **Tracking**: Consulta el estado de envíos de Andreani
+- **Buscar Caso**: Busca casos por número de pedido
+
+### Solución de Problemas
+
+#### Error: "No se configuró el canal de Solicitudes de Envíos"
+- Asegúrate de que `TARGET_CHANNEL_ID_CASOS_ENVIOS` esté configurado en tu archivo `.env`
+- Verifica que el ID del canal sea correcto
+
+#### Error: "Error en la interacción"
+- Los errores de interacción han sido mejorados con manejo de excepciones
+- Verifica que todas las variables de configuración estén correctamente definidas
+- Revisa los logs del bot para más detalles sobre errores específicos
+
+## Instalación y Uso
+
+1. Clona el repositorio
+2. Instala las dependencias: `pip install -r requirements.txt`
+3. Configura las variables de entorno en un archivo `.env`
+4. Ejecuta el bot: `python main.py`
+
+## Comandos Disponibles
+
+### Comandos de Administración
+- `/setup_panel_comandos`: Publica el panel de comandos (solo admins)
+- `/setup_panel_tareas`: Publica el panel de tareas (solo admins)
+
+### Comandos de Usuario
+- `/factura-a`: Solicita registro de Factura A
+- `/tracking <numero>`: Consulta estado de envío
+- `/cambios-devoluciones`: Inicia registro de caso
+- `/buscar-caso <pedido>`: Busca caso por número de pedido
+- `/solicitudes-envios`: Inicia solicitud sobre envíos
+
+## Notas de Desarrollo
+
+### Mejoras Recientes
+- ✅ Manejo mejorado de errores en botones del panel
+- ✅ Validación de variables de configuración
+- ✅ Mensajes de error más informativos
+- ✅ Corrección del botón "Solicitudes de Envíos"
+
+### Variables Faltantes Agregadas
+- `TARGET_CHANNEL_ID_CASOS_ENVIOS`: Para el canal de solicitudes de envíos
+- `TARGET_CHANNEL_ID_GUIA_COMANDOS`: Para el canal de guía de comandos
+
+### Manejo de Errores
+Todos los botones del panel ahora incluyen:
+- Try-catch blocks para capturar excepciones
+- Mensajes de error informativos para el usuario
+- Logs detallados para debugging
+- Validación de permisos y configuración 
