@@ -106,6 +106,8 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             await interaction.response.send_message(confirmation_message, ephemeral=True)
         except Exception as error:
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud de Factura A. Detalles: {error}', ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
 class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
     def __init__(self):
@@ -246,6 +248,8 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             print('Error general durante el procesamiento del modal de caso (on_submit):', error)
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu caso. Detalles: {error}', ephemeral=True)
             state_manager.delete_user_state(str(interaction.user.id), "cambios_devoluciones")
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
 class TrackingModal(discord.ui.Modal, title='Consulta de Tracking'):
     def __init__(self):
@@ -320,6 +324,8 @@ class TrackingModal(discord.ui.Modal, title='Consulta de Tracking'):
             
         except Exception as error:
             await interaction.followup.send(f'❌ Hubo un error al consultar el tracking. Detalles: {error}', ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
 def clean_html(raw_html):
     """Limpia etiquetas HTML de un string"""
@@ -419,6 +425,8 @@ class BuscarCasoModal(discord.ui.Modal, title='Búsqueda de Caso'):
         except Exception as error:
             print('Error general durante la búsqueda de casos en Google Sheets:', error)
             await interaction.followup.send('❌ Hubo un error al realizar la búsqueda de casos. Por favor, inténtalo de nuevo o contacta a un administrador.', ephemeral=False)
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
 class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
     def __init__(self, tarea_id, user_id):
@@ -601,6 +609,8 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                         )
                     except:
                         print(f'[FINALIZAR TAREA] ❌ ERROR FATAL: No se pudo enviar ninguna confirmación al usuario')
+            if not interaction.response.is_done():
+                await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
 class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de Envío'):
     def __init__(self):
@@ -753,6 +763,8 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
             print('Error general durante el procesamiento del modal de solicitud de envíos (on_submit):', error)
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
             state_manager.delete_user_state(str(interaction.user.id), "solicitudes_envios")
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
 class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
     def __init__(self):
@@ -910,6 +922,8 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             print('Error general durante el procesamiento del modal de reembolsos (on_submit):', error)
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
             state_manager.delete_user_state(str(interaction.user.id), "reembolsos")
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
 class Modals(commands.Cog):
     def __init__(self, bot):
