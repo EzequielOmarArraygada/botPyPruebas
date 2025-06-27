@@ -539,19 +539,11 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             # 7. Garantizar confirmación al usuario
             if not confirmacion_enviada:
                 if embed_actualizado:
-                    # Si el embed se actualizó, enviar confirmación adicional
-                    await interaction.followup.send(
-                        f'✅ **Tarea finalizada exitosamente**\n\n'
-                        f'📋 **Detalles:**\n'
-                        f'• **Tarea:** {datos_tarea["tarea"]}\n'
-                        f'• **Casos gestionados:** {cantidad}\n'
-                        f'• **Fecha de finalización:** {fecha_finalizacion}\n'
-                        f'• **Estado:** Finalizada\n\n'
-                        f'La tarea ha sido registrada en Google Sheets y el embed ha sido actualizado.',
-                        ephemeral=True
-                    )
+                    # Si el embed se actualizó correctamente, no necesitamos mensaje adicional
+                    # El embed actualizado ya es suficiente confirmación visual
+                    print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente - Embed actualizado')
                 else:
-                    # Si no se pudo actualizar el embed, enviar confirmación principal
+                    # Solo enviar confirmación si no se pudo actualizar el embed
                     await interaction.followup.send(
                         f'✅ **Tarea finalizada exitosamente**\n\n'
                         f'📋 **Detalles:**\n'
