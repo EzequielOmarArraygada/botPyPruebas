@@ -205,7 +205,7 @@ class TaskStartButton(discord.ui.Button):
                         'channel_id': canal_registro.id,
                         'type': 'tarea',
                         'timestamp': time.time()
-                    })
+                    }, "tarea")
             # Enviar mensaje de confirmación y borrarlo a los 2 minutos
             msg_confirm = await interaction.channel.send(f'¡Tarea "{tarea}" iniciada y registrada!')
             await asyncio.sleep(120)
@@ -264,7 +264,7 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                         'channel_id': canal_registro.id,
                         'type': 'tarea',
                         'timestamp': time.time()
-                    })
+                    }, "tarea")
             
             # Enviar confirmación al usuario
             await interaction.response.send_message(

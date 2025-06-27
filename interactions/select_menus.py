@@ -45,7 +45,7 @@ class TipoSolicitudEnviosSelect(discord.ui.Select):
         from utils.state_manager import set_user_state
         user_id = str(interaction.user.id)
         selected_tipo = self.values[0]
-        set_user_state(user_id, {"type": "solicitudes_envios", "paso": 2, "tipoSolicitud": selected_tipo})
+        set_user_state(user_id, {"type": "solicitudes_envios", "paso": 2, "tipoSolicitud": selected_tipo}, "solicitudes_envios")
         from interactions.modals import SolicitudEnviosModal
         await interaction.response.send_modal(SolicitudEnviosModal())
 
@@ -69,7 +69,7 @@ class TipoReembolsoSelect(discord.ui.Select):
         from utils.state_manager import set_user_state
         user_id = str(interaction.user.id)
         selected_tipo = self.values[0]
-        set_user_state(user_id, {"type": "reembolsos", "paso": 2, "tipoReembolso": selected_tipo})
+        set_user_state(user_id, {"type": "reembolsos", "paso": 2, "tipoReembolso": selected_tipo}, "reembolso")
         from interactions.modals import ReembolsoModal
         await interaction.response.send_modal(ReembolsoModal())
 

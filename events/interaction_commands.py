@@ -133,7 +133,7 @@ class InteractionCommands(commands.Cog):
         from utils.state_manager import set_user_state, delete_user_state
         try:
             view = build_tipo_solicitud_select_menu()
-            set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1})
+            set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1}, "cambios_devoluciones")
             await interaction.response.send_message(
                 content='Por favor, selecciona el tipo de solicitud:',
                 view=view,
@@ -144,7 +144,7 @@ class InteractionCommands(commands.Cog):
             print('Error al mostrar el Select Menu de Tipo de Solicitud:', error)
             await interaction.response.send_message(
                 'Hubo un error al iniciar el formulario de registro de Cambios/Devoluciones. Por favor, inténtalo de nuevo.', ephemeral=True)
-            delete_user_state(str(interaction.user.id))
+            delete_user_state(str(interaction.user.id), "cambios_devoluciones")
 
     @maybe_guild_decorator()
     @app_commands.command(name="buscar-caso", description="Busca un caso por número de pedido en las hojas configuradas")
@@ -242,7 +242,7 @@ class InteractionCommands(commands.Cog):
         from utils.state_manager import set_user_state, delete_user_state
         try:
             view = build_tipo_solicitud_envios_menu()
-            set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1})
+            set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1}, "solicitudes_envios")
             await interaction.response.send_message(
                 content='Por favor, selecciona el tipo de solicitud de envío:',
                 view=view,
@@ -253,7 +253,7 @@ class InteractionCommands(commands.Cog):
             print('Error al mostrar el Select Menu de Solicitudes de Envíos:', error)
             await interaction.response.send_message(
                 'Hubo un error al iniciar el formulario de Solicitudes de Envíos. Por favor, inténtalo de nuevo.', ephemeral=True)
-            delete_user_state(str(interaction.user.id))
+            delete_user_state(str(interaction.user.id), "solicitudes_envios")
 
     @maybe_guild_decorator()
     @app_commands.command(name="testping", description="Verifica si el bot está activo.")

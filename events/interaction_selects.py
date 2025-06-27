@@ -36,7 +36,7 @@ class InteractionSelects(commands.Cog):
             print('DEBUG: Interacción recibida del select menu')
             try:
                 user_id = str(interaction.user.id)
-                pending_data = state_manager.get_user_state(user_id)
+                pending_data = state_manager.get_user_state(user_id, "cambios_devoluciones")
                 print(f'DEBUG: Estado pendiente para usuario {user_id}: {pending_data}')
                 if pending_data and pending_data.get('type') == 'cambios_devoluciones' and pending_data.get('paso') == 1:
                     try:
@@ -53,7 +53,7 @@ class InteractionSelects(commands.Cog):
                                 "tipoSolicitud": selected_tipo,
                                 "solicitud_id": solicitud_id,
                                 "timestamp": now
-                            })
+                            }, "cambios_devoluciones")
                             print('DEBUG: Estado actualizado, creando CompleteCasoView...')
                             try:
                                 print('DEBUG: Antes de crear CompleteCasoView')
@@ -77,13 +77,13 @@ class InteractionSelects(commands.Cog):
                             content='Error al procesar la selección. Por favor, intenta de nuevo.',
                             view=None
                         )
-                        state_manager.delete_user_state(user_id)
+                        state_manager.delete_user_state(user_id, "cambios_devoluciones")
                 else:
                     await interaction.response.edit_message(
                         content='Esta selección no corresponde a un proceso activo. Por favor, usa el comando /cambios-devoluciones para empezar.',
                         view=None
                     )
-                    state_manager.delete_user_state(user_id)
+                    state_manager.delete_user_state(user_id, "cambios_devoluciones")
             except Exception as e:
                 print(f'ERROR GLOBAL en el bloque del select menu: {e}')
 
@@ -93,7 +93,7 @@ class InteractionSelects(commands.Cog):
               interaction.data.get('custom_id') == 'completeCasoDetailsButton'):
             
             user_id = str(interaction.user.id)
-            pending_data = state_manager.get_user_state(user_id)
+            pending_data = state_manager.get_user_state(user_id, "cambios_devoluciones")
             if pending_data and pending_data.get('type') == 'cambios_devoluciones' and pending_data.get('paso') == 2 and pending_data.get('tipoSolicitud'):
                 modal = CasoModal()
                 await interaction.response.send_modal(modal)
@@ -102,7 +102,7 @@ class InteractionSelects(commands.Cog):
                     content='Este botón no corresponde a un proceso activo. Por favor, usa el comando /cambios-devoluciones para empezar.',
                     view=None
                 )
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "cambios_devoluciones")
 
         # --- Manejar sumisión de modals (FacturaAModal) ---
         # (Eliminado: ahora se maneja en on_submit del modal FacturaAModal)

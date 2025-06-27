@@ -97,7 +97,7 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             sheet.append_row(row_data)
             parent_folder_id = getattr(config, 'PARENT_DRIVE_FOLDER_ID', None)
             if parent_folder_id:
-                state_manager.set_user_state(user_id, {"type": "facturaA", "pedido": pedido, "solicitud_id": solicitud_id, "timestamp": now.timestamp()})
+                state_manager.set_user_state(user_id, {"type": "facturaA", "pedido": pedido, "solicitud_id": solicitud_id, "timestamp": now.timestamp()}, "facturaA")
             confirmation_message = '✅ **Solicitud de Factura A cargada correctamente en Google Sheets.**'
             if parent_folder_id:
                 confirmation_message += '\n\n📎 **Próximo paso:** Envía los archivos adjuntos para esta solicitud en un **mensaje separado** aquí mismo en este canal.'
@@ -147,10 +147,10 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
         cleanup_expired_states()
         try:
             user_id = str(interaction.user.id)
-            pending_data = state_manager.get_user_state(user_id)
+            pending_data = state_manager.get_user_state(user_id, "cambios_devoluciones")
             if not pending_data or pending_data.get('type') != 'cambios_devoluciones':
                 await interaction.response.send_message('❌ Error: No hay un proceso de Cambios/Devoluciones activo. Usa /cambios-devoluciones para empezar.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "cambios_devoluciones")
                 return
             # Recuperar datos del modal
             pedido = self.pedido.value.strip()
@@ -161,7 +161,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             # Validar datos requeridos
             if not pedido or not numero_caso or not datos_contacto:
                 await interaction.response.send_message('❌ Error: Todos los campos son requeridos.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "cambios_devoluciones")
                 return
             # Verificar duplicado y guardar en Google Sheets
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
@@ -169,11 +169,11 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
                 await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "cambios_devoluciones")
                 return
             if not config.SPREADSHEET_ID_CASOS:
                 await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "cambios_devoluciones")
                 return
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
@@ -197,7 +197,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             if is_duplicate:
                 await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Casos.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "cambios_devoluciones")
                 return
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
@@ -241,11 +241,11 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
             sheet.append_row(row_data)
             confirmation_message = f"""✅ **Caso registrado exitosamente**\n\n📋 **Detalles del caso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n\nEl caso ha sido guardado en Google Sheets y será monitoreado automáticamente."""
             await interaction.response.send_message(confirmation_message, ephemeral=True)
-            state_manager.delete_user_state(user_id)
+            state_manager.delete_user_state(user_id, "cambios_devoluciones")
         except Exception as error:
             print('Error general durante el procesamiento del modal de caso (on_submit):', error)
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu caso. Detalles: {error}', ephemeral=True)
-            state_manager.delete_user_state(str(interaction.user.id))
+            state_manager.delete_user_state(str(interaction.user.id), "cambios_devoluciones")
 
 class TrackingModal(discord.ui.Modal, title='Consulta de Tracking'):
     def __init__(self):
@@ -437,7 +437,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
         import config
         import utils.google_sheets as google_sheets
         from tasks.panel import crear_embed_tarea
-        from utils.state_manager import get_user_state
+        from utils.state_manager import get_user_state, delete_user_state
         from datetime import datetime
         import pytz
         import asyncio
@@ -522,7 +522,14 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             # 6. Buscar y actualizar el mensaje original de la tarea
             print(f'[FINALIZAR TAREA] Buscando mensaje original...')
             user_id = str(interaction.user.id)
-            estado = get_user_state(user_id)
+            estado = get_user_state(user_id, "tarea")
+            if not estado:
+                await interaction.followup.send(
+                    "❌ No se encontró el estado de la tarea para este usuario. Es posible que la tarea no se haya iniciado correctamente o que el estado se haya perdido.\n\n"
+                    "Por favor, verifica en Google Sheets si la tarea fue registrada y vuelve a intentarlo.",
+                    ephemeral=True
+                )
+                return
             message_id = estado.get('message_id')
             channel_id = estado.get('channel_id')
             
@@ -565,6 +572,9 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 confirmacion_enviada = True
                 
             print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente')
+            
+            # Cuando corresponda borrar el estado:
+            delete_user_state(user_id, "tarea")
             
         except Exception as e:
             print(f'[FINALIZAR TAREA] ❌ ERROR CRÍTICO: {e}')
@@ -636,10 +646,10 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
         cleanup_expired_states()
         try:
             user_id = str(interaction.user.id)
-            pending_data = state_manager.get_user_state(user_id)
+            pending_data = state_manager.get_user_state(user_id, "solicitudes_envios")
             if not pending_data or pending_data.get('type') != 'solicitudes_envios':
                 await interaction.response.send_message('❌ Error: No hay un proceso de Solicitudes de Envíos activo. Usa /solicitudes-envios para empezar.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
             pedido = self.pedido.value.strip()
             numero_caso = self.numero_caso.value.strip()
@@ -649,22 +659,22 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
             solicitud_id = pending_data.get('solicitud_id') or generar_solicitud_id(user_id)
             if not pedido or not numero_caso or not direccion_telefono:
                 await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
             from datetime import datetime
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
                 await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
             if not config.SPREADSHEET_ID_CASOS:
                 await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
             if not hasattr(config, 'GOOGLE_SHEET_RANGE_ENVIOS'):
                 await interaction.response.send_message('❌ Error: La variable GOOGLE_SHEET_RANGE_ENVIOS no está configurada.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
@@ -688,7 +698,7 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
             is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             if is_duplicate:
                 await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Solicitudes de Envíos.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
@@ -735,11 +745,11 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
                 confirmation_message += f"• **Observaciones:** {observaciones}\n"
             confirmation_message += "\nLa solicitud ha sido guardada en Google Sheets y será monitoreada automáticamente."
             await interaction.response.send_message(confirmation_message, ephemeral=True)
-            state_manager.delete_user_state(user_id)
+            state_manager.delete_user_state(user_id, "solicitudes_envios")
         except Exception as error:
             print('Error general durante el procesamiento del modal de solicitud de envíos (on_submit):', error)
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
-            state_manager.delete_user_state(str(interaction.user.id))
+            state_manager.delete_user_state(str(interaction.user.id), "solicitudes_envios")
 
 class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
     def __init__(self):
@@ -798,10 +808,10 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
         cleanup_expired_states()
         try:
             user_id = str(interaction.user.id)
-            pending_data = state_manager.get_user_state(user_id)
+            pending_data = state_manager.get_user_state(user_id, "reembolsos")
             if not pending_data or pending_data.get('type') != 'reembolsos':
                 await interaction.response.send_message('❌ Error: No hay un proceso de Reembolsos activo. Usa el botón del panel para empezar.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "reembolsos")
                 return
             pedido = self.pedido.value.strip()
             zre = self.zre.value.strip()
@@ -814,14 +824,14 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             # Validar campos obligatorios
             if not pedido or not zre or not tarjeta or not correo:
                 await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "reembolsos")
                 return
             
             # Validar formato de email
             email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
             if not re.match(email_pattern, correo):
                 await interaction.response.send_message('❌ Error: El formato del correo electrónico no es válido.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "reembolsos")
                 return
             
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
@@ -829,15 +839,15 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
                 await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "reembolsos")
                 return
             if not config.SPREADSHEET_ID_CASOS:
                 await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "reembolsos")
                 return
             if not hasattr(config, 'SHEET_RANGE_REEMBOLSOS'):
                 await interaction.response.send_message('❌ Error: La variable SHEET_RANGE_REEMBOLSOS no está configurada.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "reembolsos")
                 return
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
@@ -861,7 +871,7 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             if is_duplicate:
                 await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Reembolsos.', ephemeral=True)
-                state_manager.delete_user_state(user_id)
+                state_manager.delete_user_state(user_id, "reembolsos")
                 return
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
@@ -892,11 +902,11 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
                 confirmation_message += f"• **Observación:** {observacion}\n"
             confirmation_message += "\nEl reembolso ha sido guardado en Google Sheets y será monitoreado automáticamente."
             await interaction.response.send_message(confirmation_message, ephemeral=True)
-            state_manager.delete_user_state(user_id)
+            state_manager.delete_user_state(user_id, "reembolsos")
         except Exception as error:
             print('Error general durante el procesamiento del modal de reembolsos (on_submit):', error)
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
-            state_manager.delete_user_state(str(interaction.user.id))
+            state_manager.delete_user_state(str(interaction.user.id), "reembolsos")
 
 class Modals(commands.Cog):
     def __init__(self, bot):

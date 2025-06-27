@@ -154,7 +154,8 @@ class AttachmentHandler(commands.Cog):
         
         user_id = str(message.author.id)
         cleanup_expired_states()
-        pending_data = get_user_state(user_id)
+        pending_data = get_user_state(user_id, "facturaA")
+        delete_user_state(user_id, "facturaA")
         
         # Solo manejar si el usuario está esperando adjuntos para Factura A
         if pending_data and pending_data.get('type') == 'facturaA' and message.attachments:
@@ -162,7 +163,6 @@ class AttachmentHandler(commands.Cog):
             solicitud_id = pending_data.get('solicitud_id')
             if not pedido:
                 await message.reply('❌ Error: No se encontró el número de pedido')
-                delete_user_state(user_id)
                 return
                 
             try:
@@ -298,12 +298,9 @@ class AttachmentHandler(commands.Cog):
                     view=view
                 )
                 
-                delete_user_state(user_id)
-                
             except Exception as error:
                 print(f'Error al subir adjuntos a Google Drive para Factura A: {error}')
                 await message.reply(f'❌ Hubo un error al subir los archivos a Google Drive. Detalles: {error}')
-                delete_user_state(user_id)
 
 async def setup(bot):
     await bot.add_cog(AttachmentHandler(bot)) 
