@@ -538,11 +538,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             
             # 7. Garantizar confirmación al usuario
             if not confirmacion_enviada:
-                if embed_actualizado:
-                    # Si el embed se actualizó correctamente, no necesitamos mensaje adicional
-                    # El embed actualizado ya es suficiente confirmación visual
-                    print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente - Embed actualizado')
-                else:
+                if not embed_actualizado:
                     # Solo enviar confirmación si no se pudo actualizar el embed
                     await interaction.followup.send(
                         f'✅ **Tarea finalizada exitosamente**\n\n'
