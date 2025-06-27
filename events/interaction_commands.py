@@ -225,38 +225,35 @@ class InteractionCommands(commands.Cog):
             print('Error general durante la búsqueda de casos en Google Sheets:', error)
             await interaction.followup.send('❌ Hubo un error al realizar la búsqueda de casos. Por favor, inténtalo de nuevo o contacta a un administrador.', ephemeral=False)
 
-    # @app_commands.command(name="manual", description="Pregunta al manual de procedimientos (IA)")
-    # @app_commands.describe(pregunta="Pregunta para el manual")
-    # async def manual(self, interaction: discord.Interaction, pregunta: str):
-    #     await interaction.response.defer(thinking=True)
-    #     
-    #     from utils.qa_service import get_answer_from_manual
-    #     from utils.manual_processor import get_manual_text
-    #     
-    #     # Verificar que el manual esté disponible
-    #     manual_text = get_manual_text()
-    #     if not manual_text:
-    #         await interaction.followup.send('❌ Error: El manual no está cargado. Por favor, avisa a un administrador.', ephemeral=True)
-    #         return
-    #         
-    #     # Verificar que la API key esté configurada
-    #     if not config.GEMINI_API_KEY:
-    #         await interaction.followup.send('❌ Error: La API de Gemini no está configurada.', ephemeral=True)
-    #         return
-    #         
-    #     try:
-    #         respuesta = await get_answer_from_manual(manual_text, pregunta, config.GEMINI_API_KEY)
-    #         respuesta_formateada = f"""
-    # ❓ **Tu pregunta:**
-    # > {pregunta}
-    # 
-    # 📖 **Respuesta del manual:**
-    # {respuesta}
-    #         """
-    #         await interaction.followup.send(respuesta_formateada, ephemeral=False)
-    #     except Exception as error:
-    #         print("Error al procesar el comando /manual:", error)
-    #         await interaction.followup.send(f'❌ Hubo un error al procesar tu pregunta. Inténtalo de nuevo más tarde. (Detalles: {error})', ephemeral=True)
+    @maybe_guild_decorator()
+    @app_commands.command(name="solicitudes-envios", description="Inicia el registro de una solicitud sobre envíos (cambio de dirección, reenvío, actualizar tracking)")
+    async def solicitudes_envios(self, interaction: discord.Interaction):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
+        # Restricción de canal
+        if hasattr(config, 'TARGET_CHANNEL_ID_CASOS_ENVIOS') and str(interaction.channel_id) != str(config.TARGET_CHANNEL_ID_CASOS_ENVIOS):
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en el canal <#{config.TARGET_CHANNEL_ID_CASOS_ENVIOS}>.", ephemeral=True)
+            return
+        from interactions.select_menus import build_tipo_solicitud_envios_menu
+        from utils.state_manager import set_user_state, delete_user_state
+        try:
+            view = build_tipo_solicitud_envios_menu()
+            set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1})
+            await interaction.response.send_message(
+                content='Por favor, selecciona el tipo de solicitud de envío:',
+                view=view,
+                ephemeral=True
+            )
+            print(f"Usuario {interaction.user} puesto en estado pendiente (solicitudes_envios, paso 1). Select Menu mostrado.")
+        except Exception as error:
+            print('Error al mostrar el Select Menu de Solicitudes de Envíos:', error)
+            await interaction.response.send_message(
+                'Hubo un error al iniciar el formulario de Solicitudes de Envíos. Por favor, inténtalo de nuevo.', ephemeral=True)
+            delete_user_state(str(interaction.user.id))
 
     @maybe_guild_decorator()
     @app_commands.command(name="testping", description="Verifica si el bot está activo.")

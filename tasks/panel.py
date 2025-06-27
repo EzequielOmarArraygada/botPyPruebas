@@ -445,6 +445,7 @@ class PanelComandosView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(FacturaAButton())
         self.add_item(CambiosDevolucionesButton())
+        self.add_item(SolicitudesEnviosButton())
         self.add_item(TrackingButton())
         self.add_item(BuscarCasoButton())
 
@@ -562,6 +563,45 @@ class IniciarCambiosDevolucionesButton(discord.ui.Button):
         from interactions.select_menus import build_tipo_solicitud_select_menu
         view = build_tipo_solicitud_select_menu()
         await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
+
+class SolicitudesEnviosButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Solicitudes de Envíos', emoji='🚚', style=discord.ButtonStyle.primary, custom_id='panel_solicitudes_envios')
+    async def callback(self, interaction: discord.Interaction):
+        from config import TARGET_CHANNEL_ID_CASOS_ENVIOS
+        canal_id = safe_int(TARGET_CHANNEL_ID_CASOS_ENVIOS)
+        if canal_id:
+            canal = interaction.guild.get_channel(canal_id)
+            if canal:
+                msg = await canal.send(f'🚚 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de envío:', view=IniciarSolicitudesEnviosView(interaction.user.id))
+                await asyncio.sleep(120)
+                try:
+                    await msg.delete()
+                except:
+                    pass
+            else:
+                await interaction.response.send_message('No se encontró el canal de Solicitudes de Envíos.', ephemeral=True)
+        else:
+            await interaction.response.send_message('No se configuró el canal de Solicitudes de Envíos.', ephemeral=True)
+
+class IniciarSolicitudesEnviosView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.add_item(IniciarSolicitudesEnviosButton(user_id))
+
+class IniciarSolicitudesEnviosButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar solicitud de envío', style=discord.ButtonStyle.primary, custom_id=f'init_solicitudes_envios_{user_id}')
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != str(self.user_id):
+            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+            return
+        from utils.state_manager import set_user_state
+        set_user_state(str(interaction.user.id), {"type": "solicitudes_envios", "paso": 1})
+        from interactions.select_menus import build_tipo_solicitud_envios_menu
+        view = build_tipo_solicitud_envios_menu()
+        await interaction.response.send_message('Por favor, selecciona el tipo de solicitud de envío:', view=view, ephemeral=True)
 
 class TrackingButton(discord.ui.Button):
     def __init__(self):

@@ -32,6 +32,31 @@ def build_tipo_solicitud_select_menu():
 
     return TipoSolicitudView()
 
+class TipoSolicitudEnviosSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label='Reenvío', value='Reenvío'),
+            discord.SelectOption(label='Cambio de dirección', value='Cambio de dirección'),
+            discord.SelectOption(label='Actualizar tracking', value='Actualizar tracking'),
+        ]
+        super().__init__(placeholder='Selecciona el tipo de solicitud de envío...', min_values=1, max_values=1, options=options, custom_id='solicitudEnviosTipoSelect')
+
+    async def callback(self, interaction: discord.Interaction):
+        from utils.state_manager import set_user_state
+        user_id = str(interaction.user.id)
+        selected_tipo = self.values[0]
+        set_user_state(user_id, {"type": "solicitudes_envios", "paso": 2, "tipoSolicitud": selected_tipo})
+        from interactions.modals import SolicitudEnviosModal
+        await interaction.response.send_modal(SolicitudEnviosModal())
+
+class TipoSolicitudEnviosView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=120)
+        self.add_item(TipoSolicitudEnviosSelect())
+
+def build_tipo_solicitud_envios_menu():
+    return TipoSolicitudEnviosView()
+
 class SelectMenus(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

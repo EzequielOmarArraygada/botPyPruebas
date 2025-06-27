@@ -518,6 +518,157 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             print(f'Error al finalizar tarea con cantidad de casos: {e}')
             await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
 
+class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de Envío'):
+    def __init__(self):
+        super().__init__(custom_id='solicitudEnviosModal')
+        self.pedido = discord.ui.TextInput(
+            label="Número de Pedido",
+            placeholder="Ingresa el número de pedido...",
+            custom_id="enviosPedidoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.numero_caso = discord.ui.TextInput(
+            label="Número de Caso",
+            placeholder="Ingresa el número de caso...",
+            custom_id="enviosNumeroCasoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.direccion_telefono = discord.ui.TextInput(
+            label="Dirección y Teléfono",
+            placeholder="Ingresa la dirección y teléfono...",
+            custom_id="enviosDireccionTelefonoInput",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=1000
+        )
+        self.observaciones = discord.ui.TextInput(
+            label="Observaciones (opcional)",
+            placeholder="Observaciones adicionales...",
+            custom_id="enviosObservacionesInput",
+            style=discord.TextStyle.paragraph,
+            required=False,
+            max_length=1000
+        )
+        self.add_item(self.pedido)
+        self.add_item(self.numero_caso)
+        self.add_item(self.direccion_telefono)
+        self.add_item(self.observaciones)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        import utils.state_manager as state_manager
+        from utils.state_manager import generar_solicitud_id, cleanup_expired_states
+        cleanup_expired_states()
+        try:
+            user_id = str(interaction.user.id)
+            pending_data = state_manager.get_user_state(user_id)
+            if not pending_data or pending_data.get('type') != 'solicitudes_envios':
+                await interaction.response.send_message('❌ Error: No hay un proceso de Solicitudes de Envíos activo. Usa /solicitudes-envios para empezar.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            pedido = self.pedido.value.strip()
+            numero_caso = self.numero_caso.value.strip()
+            direccion_telefono = self.direccion_telefono.value.strip()
+            observaciones = self.observaciones.value.strip()
+            tipo_solicitud = pending_data.get('tipoSolicitud', 'OTROS')
+            solicitud_id = pending_data.get('solicitud_id') or generar_solicitud_id(user_id)
+            if not pedido or not numero_caso or not direccion_telefono:
+                await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from datetime import datetime
+            import pytz
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            if not config.SPREADSHEET_ID_CASOS:
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            if not hasattr(config, 'GOOGLE_SHEET_RANGE_ENVIOS'):
+                await interaction.response.send_message('❌ Error: La variable GOOGLE_SHEET_RANGE_ENVIOS no está configurada.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
+            sheet_range = getattr(config, 'GOOGLE_SHEET_RANGE_ENVIOS', 'CAMBIO DE DIRECCIÓN 2025!A:M')
+            hoja_nombre = None
+            if '!' in sheet_range:
+                partes = sheet_range.split('!')
+                if len(partes) == 2:
+                    hoja_nombre = partes[0].strip("'")
+                    sheet_range_puro = partes[1]
+                else:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+            else:
+                sheet_range_puro = sheet_range
+            if hoja_nombre:
+                sheet = spreadsheet.worksheet(hoja_nombre)
+            else:
+                sheet = spreadsheet.sheet1
+            rows = sheet.get(sheet_range_puro)
+            is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
+            if is_duplicate:
+                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Solicitudes de Envíos.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
+            agente_name = interaction.user.display_name
+            # Construir la fila según el header
+            header = rows[0] if rows else []
+            row_data = [
+                pedido,           # A - Número de Pedido
+                fecha_hora,       # B - Fecha
+                agente_name,      # C - Agente
+                numero_caso,      # D - Número de Caso
+                tipo_solicitud,   # E - Tipo de Solicitud
+                direccion_telefono, # F - Dirección/Teléfono/Datos
+                '',               # G - Referencia (Back Office)
+                'Nadie',          # H - Agente Back
+                'No',             # I - Resuelto
+                observaciones     # J - Observaciones
+            ]
+            # Ajustar la cantidad de columnas al header
+            if len(row_data) < len(header):
+                row_data += [''] * (len(header) - len(row_data))
+            elif len(row_data) > len(header):
+                row_data = row_data[:len(header)]
+            # Cargar valores por defecto en las columnas especiales
+            def normaliza_columna(nombre):
+                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
+            idx_agente_back = None
+            idx_resuelto = None
+            for idx, col_name in enumerate(header):
+                norm = normaliza_columna(col_name)
+                if norm == normaliza_columna('Agente Back'):
+                    idx_agente_back = idx
+                if norm == normaliza_columna('Resuelto'):
+                    idx_resuelto = idx
+            if idx_agente_back is not None:
+                row_data[idx_agente_back] = 'Nadie'
+            if idx_resuelto is not None:
+                row_data[idx_resuelto] = 'No'
+            sheet.append_row(row_data)
+            confirmation_message = f"""✅ **Solicitud registrada exitosamente**\n\n📋 **Detalles de la solicitud:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n• **Dirección y Teléfono:** {direccion_telefono}\n"""
+            if observaciones:
+                confirmation_message += f"• **Observaciones:** {observaciones}\n"
+            confirmation_message += "\nLa solicitud ha sido guardada en Google Sheets y será monitoreada automáticamente."
+            await interaction.response.send_message(confirmation_message, ephemeral=True)
+            state_manager.delete_user_state(user_id)
+        except Exception as error:
+            print('Error general durante el procesamiento del modal de solicitud de envíos (on_submit):', error)
+            await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
+            state_manager.delete_user_state(str(interaction.user.id))
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -533,6 +684,12 @@ class Modals(commands.Cog):
     async def caso(self, ctx):
         """Muestra el modal de Caso"""
         modal = CasoModal()
+        await ctx.send_modal(modal)
+
+    @commands.command()
+    async def solicitud_envios(self, ctx):
+        """Muestra el modal de Solicitud de Envío"""
+        modal = SolicitudEnviosModal()
         await ctx.send_modal(modal)
 
 async def setup(bot):
