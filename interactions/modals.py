@@ -148,8 +148,8 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
         try:
             user_id = str(interaction.user.id)
             pending_data = state_manager.get_user_state(user_id)
-            if not pending_data or pending_data.get('type') != 'caso':
-                await interaction.response.send_message('❌ Error: No hay un proceso de caso activo. Usa /agregar-caso para empezar.', ephemeral=True)
+            if not pending_data or pending_data.get('type') != 'cambios_devoluciones':
+                await interaction.response.send_message('❌ Error: No hay un proceso de Cambios/Devoluciones activo. Usa /cambios-devoluciones para empezar.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
                 return
             # Recuperar datos del modal

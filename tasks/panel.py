@@ -444,7 +444,7 @@ class PanelComandosView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(FacturaAButton())
-        self.add_item(AgregarCasoButton())
+        self.add_item(CambiosDevolucionesButton())
         self.add_item(TrackingButton())
         self.add_item(BuscarCasoButton())
 
@@ -470,26 +470,6 @@ class IniciarFacturaAButton(discord.ui.Button):
             return
         from interactions.modals import FacturaAModal
         await interaction.response.send_modal(FacturaAModal())
-
-class IniciarCasoView(discord.ui.View):
-    def __init__(self, user_id):
-        super().__init__(timeout=300)
-        self.add_item(IniciarCasoButton(user_id))
-
-class IniciarCasoButton(discord.ui.Button):
-    def __init__(self, user_id):
-        super().__init__(label='Iniciar registro de caso', style=discord.ButtonStyle.success, custom_id=f'init_caso_{user_id}')
-        self.user_id = user_id
-    async def callback(self, interaction: discord.Interaction):
-        if str(interaction.user.id) != str(self.user_id):
-            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
-            return
-        # Inicializar el state del usuario igual que /agregar-caso
-        from utils.state_manager import set_user_state
-        set_user_state(str(interaction.user.id), {"type": "caso", "paso": 1})
-        from interactions.select_menus import build_tipo_solicitud_select_menu
-        view = build_tipo_solicitud_select_menu()
-        await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
 
 class IniciarTrackingView(discord.ui.View):
     def __init__(self, user_id):
@@ -544,26 +524,44 @@ class FacturaAButton(discord.ui.Button):
         else:
             await interaction.response.send_message('No se configuró el canal de Factura A.', ephemeral=True)
 
-class AgregarCasoButton(discord.ui.Button):
+class CambiosDevolucionesButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label='Agregar caso', emoji='📝', style=discord.ButtonStyle.success, custom_id='panel_agregar_caso')
+        super().__init__(label='Cambios/Devoluciones', emoji='🔄', style=discord.ButtonStyle.success, custom_id='panel_cambios_devoluciones')
     async def callback(self, interaction: discord.Interaction):
         from config import TARGET_CHANNEL_ID_CASOS
         canal_id = safe_int(TARGET_CHANNEL_ID_CASOS)
         if canal_id:
             canal = interaction.guild.get_channel(canal_id)
             if canal:
-                msg = await canal.send(f'📝 {interaction.user.mention}, haz clic en el botón para iniciar el registro de un caso:', view=IniciarCasoView(interaction.user.id))
-                # No enviar mensaje efímero en el panel de comandos
+                msg = await canal.send(f'🔄 {interaction.user.mention}, haz clic en el botón para iniciar el registro de Cambios/Devoluciones:', view=IniciarCambiosDevolucionesView(interaction.user.id))
                 await asyncio.sleep(120)
                 try:
                     await msg.delete()
                 except:
                     pass
             else:
-                await interaction.response.send_message('No se encontró el canal de Casos.', ephemeral=True)
+                await interaction.response.send_message('No se encontró el canal de Cambios/Devoluciones.', ephemeral=True)
         else:
-            await interaction.response.send_message('No se configuró el canal de Casos.', ephemeral=True)
+            await interaction.response.send_message('No se configuró el canal de Cambios/Devoluciones.', ephemeral=True)
+
+class IniciarCambiosDevolucionesView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.add_item(IniciarCambiosDevolucionesButton(user_id))
+
+class IniciarCambiosDevolucionesButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar registro de Cambios/Devoluciones', style=discord.ButtonStyle.success, custom_id=f'init_cambios_devoluciones_{user_id}')
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != str(self.user_id):
+            await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+            return
+        from utils.state_manager import set_user_state
+        set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1})
+        from interactions.select_menus import build_tipo_solicitud_select_menu
+        view = build_tipo_solicitud_select_menu()
+        await interaction.response.send_message('Por favor, selecciona el tipo de solicitud:', view=view, ephemeral=True)
 
 class TrackingButton(discord.ui.Button):
     def __init__(self):

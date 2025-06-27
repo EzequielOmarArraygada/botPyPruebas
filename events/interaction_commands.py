@@ -117,8 +117,8 @@ class InteractionCommands(commands.Cog):
         await interaction.followup.send(tracking_info, ephemeral=False)
 
     @maybe_guild_decorator()
-    @app_commands.command(name="agregar-caso", description="Inicia el registro de un nuevo caso")
-    async def agregar_caso(self, interaction: discord.Interaction):
+    @app_commands.command(name="cambios-devoluciones", description="Inicia el registro de un nuevo caso de Cambios/Devoluciones")
+    async def cambios_devoluciones(self, interaction: discord.Interaction):
         target_cat = get_target_category_id()
         if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
             await interaction.response.send_message(
@@ -133,17 +133,17 @@ class InteractionCommands(commands.Cog):
         from utils.state_manager import set_user_state, delete_user_state
         try:
             view = build_tipo_solicitud_select_menu()
-            set_user_state(str(interaction.user.id), {"type": "caso", "paso": 1})
+            set_user_state(str(interaction.user.id), {"type": "cambios_devoluciones", "paso": 1})
             await interaction.response.send_message(
                 content='Por favor, selecciona el tipo de solicitud:',
                 view=view,
                 ephemeral=True
             )
-            print(f"Usuario {interaction.user} puesto en estado pendiente (caso, paso 1). Select Menu mostrado.")
+            print(f"Usuario {interaction.user} puesto en estado pendiente (cambios_devoluciones, paso 1). Select Menu mostrado.")
         except Exception as error:
             print('Error al mostrar el Select Menu de Tipo de Solicitud:', error)
             await interaction.response.send_message(
-                'Hubo un error al iniciar el formulario de registro de caso. Por favor, inténtalo de nuevo.', ephemeral=True)
+                'Hubo un error al iniciar el formulario de registro de Cambios/Devoluciones. Por favor, inténtalo de nuevo.', ephemeral=True)
             delete_user_state(str(interaction.user.id))
 
     @maybe_guild_decorator()
