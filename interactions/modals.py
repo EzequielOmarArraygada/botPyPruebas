@@ -453,8 +453,15 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_finalizacion = now.strftime('%d/%m/%Y %H:%M:%S')
-            # Finalizar tarea en Google Sheets
-            google_sheets.finalizar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, cantidad, fecha_finalizacion)
+            # Finalizar tarea en Google Sheets (con cantidad de casos)
+            google_sheets.finalizar_tarea_por_id_con_cantidad(
+                sheet_activas,
+                sheet_historial,
+                self.tarea_id,
+                str(interaction.user),
+                fecha_finalizacion,
+                cantidad
+            )
             # Actualizar el embed con estado finalizado y cantidad de casos
             embed = crear_embed_tarea(
                 interaction.user,
