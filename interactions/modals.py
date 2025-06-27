@@ -649,48 +649,49 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             required=True,
             max_length=100
         )
-        self.numero_caso = discord.ui.TextInput(
-            label="Número de Caso",
-            placeholder="Ingresa el número de caso...",
-            custom_id="reembolsoNumeroCasoInput",
+        self.zre = discord.ui.TextInput(
+            label="ZRE2 / ZRE4",
+            placeholder="Ingresa ZRE2 o ZRE4...",
+            custom_id="reembolsoZREInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=10
+        )
+        self.tarjeta = discord.ui.TextInput(
+            label="Tarjeta",
+            placeholder="Ingresa el número de tarjeta...",
+            custom_id="reembolsoTarjetaInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=50
+        )
+        self.correo = discord.ui.TextInput(
+            label="Correo del Cliente",
+            placeholder="ejemplo@email.com",
+            custom_id="reembolsoCorreoInput",
             style=discord.TextStyle.short,
             required=True,
             max_length=100
         )
-        self.monto = discord.ui.TextInput(
-            label="Monto a reembolsar",
-            placeholder="Ejemplo: 1000.00",
-            custom_id="reembolsoMontoInput",
-            style=discord.TextStyle.short,
-            required=True,
-            max_length=20
-        )
-        self.motivo = discord.ui.TextInput(
-            label="Motivo del reembolso",
-            placeholder="Describe el motivo del reembolso...",
-            custom_id="reembolsoMotivoInput",
-            style=discord.TextStyle.paragraph,
-            required=True,
-            max_length=1000
-        )
-        self.observaciones = discord.ui.TextInput(
-            label="Observaciones (opcional)",
+        self.observacion = discord.ui.TextInput(
+            label="Observación Adicional (opcional)",
             placeholder="Observaciones adicionales...",
-            custom_id="reembolsoObservacionesInput",
+            custom_id="reembolsoObservacionInput",
             style=discord.TextStyle.paragraph,
             required=False,
             max_length=1000
         )
         self.add_item(self.pedido)
-        self.add_item(self.numero_caso)
-        self.add_item(self.monto)
-        self.add_item(self.motivo)
-        self.add_item(self.observaciones)
+        self.add_item(self.zre)
+        self.add_item(self.tarjeta)
+        self.add_item(self.correo)
+        self.add_item(self.observacion)
 
     async def on_submit(self, interaction: discord.Interaction):
         import config
         import utils.state_manager as state_manager
         from utils.state_manager import generar_solicitud_id, cleanup_expired_states
+        import re
         cleanup_expired_states()
         try:
             user_id = str(interaction.user.id)
@@ -700,16 +701,26 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
                 state_manager.delete_user_state(user_id)
                 return
             pedido = self.pedido.value.strip()
-            numero_caso = self.numero_caso.value.strip()
-            monto = self.monto.value.strip()
-            motivo = self.motivo.value.strip()
-            observaciones = self.observaciones.value.strip()
-            tipo_reembolso = pending_data.get('tipoReembolso', 'OTROS')
+            zre = self.zre.value.strip()
+            tarjeta = self.tarjeta.value.strip()
+            correo = self.correo.value.strip()
+            observacion = self.observacion.value.strip()
+            motivo_reembolso = pending_data.get('tipoReembolso', 'OTROS')
             solicitud_id = pending_data.get('solicitud_id') or generar_solicitud_id(user_id)
-            if not pedido or not numero_caso or not monto or not motivo:
+            
+            # Validar campos obligatorios
+            if not pedido or not zre or not tarjeta or not correo:
                 await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
                 return
+            
+            # Validar formato de email
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, correo):
+                await interaction.response.send_message('❌ Error: El formato del correo electrónico no es válido.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
             from datetime import datetime
             import pytz
@@ -717,8 +728,8 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
                 await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
                 return
-            if not config.SPREADSHEET_ID_REEMBOLSOS:
-                await interaction.response.send_message('❌ Error: El ID de la hoja de Reembolsos no está configurado.', ephemeral=True)
+            if not config.SPREADSHEET_ID_CASOS:
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
                 state_manager.delete_user_state(user_id)
                 return
             if not hasattr(config, 'SHEET_RANGE_REEMBOLSOS'):
@@ -726,8 +737,8 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
                 state_manager.delete_user_state(user_id)
                 return
             client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
-            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_REEMBOLSOS)
-            sheet_range = getattr(config, 'SHEET_RANGE_REEMBOLSOS', 'A:G')
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
+            sheet_range = getattr(config, 'SHEET_RANGE_REEMBOLSOS', 'REEMBOLSOS!A:L')
             hoja_nombre = None
             if '!' in sheet_range:
                 partes = sheet_range.split('!')
@@ -753,27 +764,57 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
             agente_name = interaction.user.display_name
+            
             # Construir la fila según el header
             header = rows[0] if rows else []
             row_data = [
                 pedido,           # A - Número de Pedido
-                fecha_hora,       # B - Fecha
-                agente_name,      # C - Agente
-                numero_caso,      # D - Número de Caso
-                tipo_reembolso,   # E - Tipo de Reembolso
-                monto,            # F - Monto
-                motivo,           # G - Motivo
-                observaciones     # H - Observaciones
+                zre,              # B - ZRE2 / ZRE4
+                tarjeta,          # C - Tarjeta
+                correo,           # D - Correo del Cliente
+                motivo_reembolso, # E - Motivo de Reembolso
+                observacion,      # F - Observación Adicional
+                agente_name,      # G - Agente (Front)
+                fecha_hora,       # H - Fecha de Compra
+                'Nadie'           # I - Agente (Back/TL)
             ]
+            
             # Ajustar la cantidad de columnas al header
             if len(row_data) < len(header):
                 row_data += [''] * (len(header) - len(row_data))
             elif len(row_data) > len(header):
                 row_data = row_data[:len(header)]
+            
+            # Mapear campos a columnas específicas por nombre
+            def normaliza_columna(nombre):
+                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
+            
+            # Buscar índices de columnas específicas
+            idx_agente_front = None
+            idx_fecha_compra = None
+            idx_agente_back = None
+            
+            for idx, col_name in enumerate(header):
+                norm = normaliza_columna(col_name)
+                if norm == normaliza_columna('Agente (Front)'):
+                    idx_agente_front = idx
+                elif norm == normaliza_columna('Fecha de Compra'):
+                    idx_fecha_compra = idx
+                elif norm == normaliza_columna('Agente (Back/TL)'):
+                    idx_agente_back = idx
+            
+            # Asignar valores a las columnas específicas
+            if idx_agente_front is not None:
+                row_data[idx_agente_front] = agente_name
+            if idx_fecha_compra is not None:
+                row_data[idx_fecha_compra] = fecha_hora
+            if idx_agente_back is not None:
+                row_data[idx_agente_back] = 'Nadie'
+            
             sheet.append_row(row_data)
-            confirmation_message = f"""✅ **Reembolso registrado exitosamente**\n\n📋 **Detalles del reembolso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Reembolso:** {tipo_reembolso}\n• **Monto:** {monto}\n• **Motivo:** {motivo}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n"""
-            if observaciones:
-                confirmation_message += f"• **Observaciones:** {observaciones}\n"
+            confirmation_message = f"""✅ **Reembolso registrado exitosamente**\n\n📋 **Detalles del reembolso:**\n• **N° de Pedido:** {pedido}\n• **ZRE2/ZRE4:** {zre}\n• **Tarjeta:** {tarjeta}\n• **Correo:** {correo}\n• **Motivo:** {motivo_reembolso}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n"""
+            if observacion:
+                confirmation_message += f"• **Observación:** {observacion}\n"
             confirmation_message += "\nEl reembolso ha sido guardado en Google Sheets y será monitoreado automáticamente."
             await interaction.response.send_message(confirmation_message, ephemeral=True)
             state_manager.delete_user_state(user_id)

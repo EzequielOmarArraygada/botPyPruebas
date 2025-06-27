@@ -60,10 +60,8 @@ def build_tipo_solicitud_envios_menu():
 class TipoReembolsoSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label='Reembolso total', value='Reembolso total'),
-            discord.SelectOption(label='Reembolso parcial', value='Reembolso parcial'),
-            discord.SelectOption(label='Rechazado', value='Rechazado'),
-            discord.SelectOption(label='OTROS', value='OTROS'),
+            discord.SelectOption(label='RETIRO (ZRE2)', value='RETIRO (ZRE2)'),
+            discord.SelectOption(label='CANCELACIÓN (ZRE4)', value='CANCELACIÓN (ZRE4)'),
         ]
         super().__init__(placeholder='Selecciona el tipo de reembolso...', min_values=1, max_values=1, options=options, custom_id='reembolsoTipoSelect')
 

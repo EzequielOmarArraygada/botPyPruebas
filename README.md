@@ -73,7 +73,7 @@ CS-Bot/
    TARGET_CHANNEL_ID_ENVIOS=your_envios_channel_id_here
    TARGET_CHANNEL_ID_CASOS=your_casos_channel_id_here
    TARGET_CHANNEL_ID_BUSCAR_CASO=your_buscar_caso_channel_id_here
-   TARGET_CHANNEL_ID_REEMBOLSOS=your_reembolsos_channel_id_here
+   TARGET_CHANNEL_ID_CASOS_REEMBOLSOS=your_reembolsos_channel_id_here
 
    # Andreani API
    ANDREANI_API_AUTH=your_andreani_auth_header_here
@@ -198,14 +198,14 @@ TARGET_CHANNEL_ID_BUSCAR_CASO=id_canal_buscar_caso
 TARGET_CHANNEL_ID_TAREAS=id_canal_tareas
 TARGET_CHANNEL_ID_TAREAS_REGISTRO=id_canal_registro_tareas
 TARGET_CHANNEL_ID_GUIA_COMANDOS=id_canal_guia_comandos
-TARGET_CHANNEL_ID_REEMBOLSOS=id_canal_reembolsos
+TARGET_CHANNEL_ID_CASOS_REEMBOLSOS=id_canal_reembolsos
 
 # Google Sheets IDs
 GOOGLE_SHEET_ID_FAC_A=id_hoja_factura_a
 GOOGLE_SHEET_ID_CASOS=id_hoja_casos
 GOOGLE_SHEET_ID_TAREAS=id_hoja_tareas
 GOOGLE_SHEET_SEARCH_SHEET_ID=id_hoja_busqueda
-GOOGLE_SHEET_ID_REEMBOLSOS=id_hoja_reembolsos
+GOOGLE_SHEET_RANGE_REEMBOLSOS=REEMBOLSOS!A:L
 
 # API de Andreani
 ANDREANI_API_AUTH=tu_header_de_autenticacion
@@ -286,7 +286,7 @@ Para que el panel de comandos funcione correctamente, asegúrate de configurar t
 ### Variables Faltantes Agregadas
 - `TARGET_CHANNEL_ID_CASOS_ENVIOS`: Para el canal de solicitudes de envíos
 - `TARGET_CHANNEL_ID_GUIA_COMANDOS`: Para el canal de guía de comandos
-- `TARGET_CHANNEL_ID_REEMBOLSOS`: Para el canal de reembolsos
+- `TARGET_CHANNEL_ID_CASOS_REEMBOLSOS`: Para el canal de reembolsos
 
 ### Manejo de Errores
 Todos los botones del panel ahora incluyen:
