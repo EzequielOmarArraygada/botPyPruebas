@@ -437,6 +437,8 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
         import config
         import utils.google_sheets as google_sheets
         from tasks.panel import crear_embed_tarea
+        from datetime import datetime
+        import pytz
         try:
             client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
@@ -447,8 +449,12 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
             cantidad = self.cantidad.value.strip()
+            # Obtener fecha de finalización
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_finalizacion = now.strftime('%d/%m/%Y %H:%M:%S')
             # Finalizar tarea en Google Sheets
-            google_sheets.finalizar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, cantidad)
+            google_sheets.finalizar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, cantidad, fecha_finalizacion)
             # Actualizar el embed con estado finalizado y cantidad de casos
             embed = crear_embed_tarea(
                 interaction.user,

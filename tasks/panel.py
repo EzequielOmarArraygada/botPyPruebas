@@ -529,8 +529,14 @@ class FacturaAButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
+                    msg_panel = await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.')
                     msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
-                    await asyncio.sleep(120)
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
                     try:
                         await msg.delete()
                     except:
@@ -555,8 +561,14 @@ class CambiosDevolucionesButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
+                    msg_panel = await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.')
                     msg = await canal.send(f'🔄 {interaction.user.mention}, haz clic en el botón para iniciar el registro de Cambios/Devoluciones:', view=IniciarCambiosDevolucionesView(interaction.user.id))
-                    await asyncio.sleep(120)
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
                     try:
                         await msg.delete()
                     except:
@@ -604,8 +616,14 @@ class SolicitudesEnviosButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
+                    msg_panel = await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.')
                     msg = await canal.send(f'🚚 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de envío:', view=IniciarSolicitudesEnviosView(interaction.user.id))
-                    await asyncio.sleep(120)
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
                     try:
                         await msg.delete()
                     except:
@@ -653,8 +671,14 @@ class TrackingButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
+                    msg_panel = await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.')
                     msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para consultar el estado de un envío:', view=IniciarTrackingView(interaction.user.id))
-                    await asyncio.sleep(120)
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
                     try:
                         await msg.delete()
                     except:
@@ -679,8 +703,14 @@ class BuscarCasoButton(discord.ui.Button):
             if canal_id:
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
+                    msg_panel = await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.')
                     msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para buscar un caso:', view=IniciarBuscarCasoView(interaction.user.id))
-                    await asyncio.sleep(120)
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
                     try:
                         await msg.delete()
                     except:
