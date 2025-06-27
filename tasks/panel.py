@@ -11,6 +11,7 @@ import utils.google_sheets as google_sheets
 import asyncio
 import pytz
 import re
+import time
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(getattr(config, 'TARGET_CHANNEL_ID_TAREAS', '0') or '0')
@@ -195,7 +196,16 @@ class TaskStartButton(discord.ui.Button):
                 if canal_registro:
                     embed = crear_embed_tarea(interaction.user, tarea, observaciones, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id, tarea_id)
-                    await canal_registro.send(embed=embed, view=view)
+                    msg = await canal_registro.send(embed=embed, view=view)
+                    # Guardar estado con message_id y channel_id
+                    from utils.state_manager import set_user_state
+                    set_user_state(str(user_id), {
+                        'tarea_id': tarea_id,
+                        'message_id': msg.id,
+                        'channel_id': canal_registro.id,
+                        'type': 'tarea',
+                        'timestamp': time.time()
+                    })
             # Enviar mensaje de confirmación y borrarlo a los 2 minutos
             msg_confirm = await interaction.channel.send(f'¡Tarea "{tarea}" iniciada y registrada!')
             await asyncio.sleep(120)
@@ -245,7 +255,16 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 if canal_registro:
                     embed = crear_embed_tarea(interaction.user, tarea, obs, inicio, 'En proceso', '00:00:00')
                     view = TareaControlView(user_id, tarea_id)
-                    await canal_registro.send(embed=embed, view=view)
+                    msg = await canal_registro.send(embed=embed, view=view)
+                    # Guardar estado con message_id y channel_id
+                    from utils.state_manager import set_user_state
+                    set_user_state(str(user_id), {
+                        'tarea_id': tarea_id,
+                        'message_id': msg.id,
+                        'channel_id': canal_registro.id,
+                        'type': 'tarea',
+                        'timestamp': time.time()
+                    })
             # No enviar mensaje de confirmación en el canal del panel
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):

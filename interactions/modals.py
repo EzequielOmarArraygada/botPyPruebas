@@ -554,6 +554,21 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 
             print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente')
             
+            # Al finalizar, buscar el mensaje original y editarlo
+            user_id = str(interaction.user.id)
+            estado = get_user_state(user_id)
+            message_id = estado.get('message_id')
+            channel_id = estado.get('channel_id')
+            if message_id and channel_id:
+                canal = interaction.guild.get_channel(channel_id)
+                if canal:
+                    try:
+                        mensaje = await canal.fetch_message(message_id)
+                        await mensaje.edit(embed=embed, view=view)
+                        embed_actualizado = True
+                    except Exception as e:
+                        print(f'[FINALIZAR TAREA] ❌ Error al editar el mensaje original por ID: {e}')
+            
         except Exception as e:
             print(f'[FINALIZAR TAREA] ❌ ERROR CRÍTICO: {e}')
             
