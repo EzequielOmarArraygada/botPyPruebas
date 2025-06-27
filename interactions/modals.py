@@ -580,7 +580,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 confirmacion_enviada = True
             # Siempre responder al interaction para evitar que quede pensando
             if not interaction.response.is_done():
-                await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
+                await interaction.followup.send('✅ Tarea finalizada.', ephemeral=True)
             
             print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente')
             
