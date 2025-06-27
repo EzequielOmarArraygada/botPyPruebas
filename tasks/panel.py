@@ -103,6 +103,7 @@ class TaskRegisterButton(discord.ui.Button):
         super().__init__(label='Registrar nueva tarea', style=discord.ButtonStyle.primary, custom_id='task_register_button')
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         user_id = str(interaction.user.id)
         msg_select = await interaction.channel.send(
             'Selecciona la tarea que vas a realizar:',
@@ -128,10 +129,11 @@ class TaskSelectMenu(discord.ui.Select):
         super().__init__(placeholder='Selecciona una tarea...', min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        seleccion = self.values[0]
-        if seleccion == 'Otra':
+        if self.values[0] == 'Otra':
             await interaction.response.send_modal(TaskObservacionesModal())
         else:
+            await interaction.response.defer()
+            seleccion = self.values[0]
             msg_tarea = await interaction.channel.send(
                 f'Tarea seleccionada: **{seleccion}**\nPresiona "Comenzar" para iniciar.',
                 view=TaskStartButtonView(seleccion)
@@ -158,6 +160,7 @@ class TaskStartButton(discord.ui.Button):
         self.tarea = tarea
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         user_id = str(interaction.user.id)
         # --- Google Sheets ---
         client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
@@ -202,9 +205,9 @@ class TaskStartButton(discord.ui.Button):
                 pass
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
-                await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
+                await interaction.followup.send(f'❌ {str(e)}', ephemeral=True)
             else:
-                await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
+                await interaction.followup.send(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
 
 class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
     observaciones = discord.ui.TextInput(label='Observaciones (opcional)', required=False, style=discord.TextStyle.paragraph)
@@ -334,8 +337,6 @@ class TareaControlView(discord.ui.View):
 
 class PausarReanudarButton(discord.ui.Button):
     def __init__(self, user_id=None, tarea_id=None):
-        # Si no se pasan, se extraen del custom_id en el callback
-        # Para vistas persistentes, usar un custom_id por defecto
         if user_id and tarea_id:
             custom_id = f'pausar_{user_id}_{tarea_id}'
         else:
@@ -358,36 +359,25 @@ class PausarReanudarButton(discord.ui.Button):
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
-        
         try:
             client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
-            
-            # Obtener datos actuales de la tarea por ID
             datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
                 await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
-            
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
-            
             if datos_tarea['estado'].lower() == 'en proceso':
-                # Pausar la tarea
                 google_sheets.pausar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
-                
-                # Actualizar el botón
                 self.label = '▶️ Reanudar'
                 self.style = discord.ButtonStyle.success
                 self.custom_id = f'reanudar_{self.user_id}_{self.tarea_id}'
-                
-                # Actualizar el embed
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.orange()
-                
                 await interaction.response.edit_message(embed=embed, view=self.view)
                 msg = await interaction.followup.send('✅ Tarea pausada correctamente.')
                 await asyncio.sleep(20)
@@ -395,20 +385,13 @@ class PausarReanudarButton(discord.ui.Button):
                     await msg.delete()
                 except:
                     pass
-                
             elif datos_tarea['estado'].lower() == 'pausada':
-                # Reanudar la tarea
                 google_sheets.reanudar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
-                
-                # Actualizar el botón
                 self.label = '⏸️ Pausar'
                 self.style = discord.ButtonStyle.secondary
                 self.custom_id = f'pausar_{self.user_id}_{self.tarea_id}'
-                
-                # Actualizar el embed
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.green()
-                
                 await interaction.response.edit_message(embed=embed, view=self.view)
                 msg = await interaction.followup.send('✅ Tarea reanudada correctamente.')
                 await asyncio.sleep(20)
@@ -416,13 +399,11 @@ class PausarReanudarButton(discord.ui.Button):
                     await msg.delete()
                 except:
                     pass
-                
         except Exception as e:
-            await interaction.response.send_message(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
+            await interaction.followup.send(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
 
 class FinalizarButton(discord.ui.Button):
     def __init__(self, user_id=None, tarea_id=None):
-        # Para vistas persistentes, usar un custom_id por defecto
         if user_id and tarea_id:
             custom_id = f'finalizar_{user_id}_{tarea_id}'
         else:
@@ -440,19 +421,15 @@ class FinalizarButton(discord.ui.Button):
             if match:
                 self.user_id = match.group(1)
                 self.tarea_id = match.group(2)
-        
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
-        
         try:
-            # Mostrar el modal para solicitar la cantidad de casos
             from interactions.modals import CantidadCasosModal
             modal = CantidadCasosModal(self.tarea_id, self.user_id)
             await interaction.response.send_modal(modal)
-            
         except Exception as e:
-            await interaction.response.send_message(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
+            await interaction.followup.send(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
 
 # --- REGISTRO DE VIEWS PERSISTENTES EN EL ARRANQUE DEL BOT ---
 async def setup(bot):
