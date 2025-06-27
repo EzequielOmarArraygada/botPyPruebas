@@ -514,12 +514,13 @@ class FacturaAButton(discord.ui.Button):
             canal = interaction.guild.get_channel(canal_id)
             if canal:
                 msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
-                # No enviar mensaje efímero en el panel de comandos
                 await asyncio.sleep(120)
                 try:
                     await msg.delete()
                 except:
                     pass
+                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                return
             else:
                 await interaction.response.send_message('No se encontró el canal de Factura A.', ephemeral=True)
         else:
@@ -540,6 +541,8 @@ class CambiosDevolucionesButton(discord.ui.Button):
                     await msg.delete()
                 except:
                     pass
+                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                return
             else:
                 await interaction.response.send_message('No se encontró el canal de Cambios/Devoluciones.', ephemeral=True)
         else:
@@ -579,6 +582,8 @@ class SolicitudesEnviosButton(discord.ui.Button):
                     await msg.delete()
                 except:
                     pass
+                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                return
             else:
                 await interaction.response.send_message('No se encontró el canal de Solicitudes de Envíos.', ephemeral=True)
         else:
@@ -618,6 +623,8 @@ class TrackingButton(discord.ui.Button):
                     await msg.delete()
                 except:
                     pass
+                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                return
             else:
                 await interaction.response.send_message('No se encontró el canal de Envíos.', ephemeral=True)
         else:
@@ -638,6 +645,8 @@ class BuscarCasoButton(discord.ui.Button):
                     await msg.delete()
                 except:
                     pass
+                await interaction.response.send_message('✅ Revisa el canal correspondiente para continuar el flujo.', ephemeral=True)
+                return
             else:
                 await interaction.response.send_message('No se encontró el canal de Búsqueda de Casos.', ephemeral=True)
         else:
