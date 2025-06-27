@@ -57,6 +57,32 @@ class TipoSolicitudEnviosView(discord.ui.View):
 def build_tipo_solicitud_envios_menu():
     return TipoSolicitudEnviosView()
 
+class TipoReembolsoSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label='Reembolso total', value='Reembolso total'),
+            discord.SelectOption(label='Reembolso parcial', value='Reembolso parcial'),
+            discord.SelectOption(label='Rechazado', value='Rechazado'),
+            discord.SelectOption(label='OTROS', value='OTROS'),
+        ]
+        super().__init__(placeholder='Selecciona el tipo de reembolso...', min_values=1, max_values=1, options=options, custom_id='reembolsoTipoSelect')
+
+    async def callback(self, interaction: discord.Interaction):
+        from utils.state_manager import set_user_state
+        user_id = str(interaction.user.id)
+        selected_tipo = self.values[0]
+        set_user_state(user_id, {"type": "reembolsos", "paso": 2, "tipoReembolso": selected_tipo})
+        from interactions.modals import ReembolsoModal
+        await interaction.response.send_modal(ReembolsoModal())
+
+class TipoReembolsoView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=120)
+        self.add_item(TipoReembolsoSelect())
+
+def build_tipo_reembolso_menu():
+    return TipoReembolsoView()
+
 class SelectMenus(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

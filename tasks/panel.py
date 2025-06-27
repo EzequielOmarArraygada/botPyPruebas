@@ -448,6 +448,7 @@ class PanelComandosView(discord.ui.View):
         self.add_item(SolicitudesEnviosButton())
         self.add_item(TrackingButton())
         self.add_item(BuscarCasoButton())
+        self.add_item(ReembolsosButton())
 
 def safe_int(val):
     """Convierte un valor a entero de forma segura, retornando 0 si no es posible"""
@@ -729,6 +730,62 @@ class BuscarCasoButton(discord.ui.Button):
             print(f'Error en BuscarCasoButton: {e}')
             if not interaction.response.is_done():
                 await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class ReembolsosButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Reembolsos', emoji='💸', style=discord.ButtonStyle.success, custom_id='panel_reembolsos')
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            from config import TARGET_CHANNEL_ID_REEMBOLSOS
+            canal_id = safe_int(TARGET_CHANNEL_ID_REEMBOLSOS)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    await interaction.response.defer()
+                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg = await canal.send(f'💸 {interaction.user.mention}, haz clic en el botón para iniciar el registro de un reembolso:', view=IniciarReembolsosView(interaction.user.id))
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Reembolsos.', ephemeral=True)
+            else:
+                await interaction.response.send_message('No se configuró el canal de Reembolsos.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en ReembolsosButton: {e}')
+            if not interaction.response.is_done():
+                await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class IniciarReembolsosView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.add_item(IniciarReembolsosButton(user_id))
+
+class IniciarReembolsosButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar registro de Reembolso', style=discord.ButtonStyle.success, custom_id=f'init_reembolsos_{user_id}')
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from utils.state_manager import set_user_state
+            set_user_state(str(interaction.user.id), {"type": "reembolsos", "paso": 1})
+            from interactions.select_menus import build_tipo_reembolso_menu
+            view = build_tipo_reembolso_menu()
+            await interaction.response.send_message('Por favor, selecciona el tipo de reembolso:', view=view, ephemeral=True)
+        except Exception as e:
+            print(f'Error en IniciarReembolsosButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class PanelComandos(commands.Cog):
     def __init__(self, bot):

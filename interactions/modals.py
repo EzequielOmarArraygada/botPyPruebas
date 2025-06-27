@@ -638,6 +638,150 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
             state_manager.delete_user_state(str(interaction.user.id))
 
+class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
+    def __init__(self):
+        super().__init__(custom_id='reembolsoModal')
+        self.pedido = discord.ui.TextInput(
+            label="Número de Pedido",
+            placeholder="Ingresa el número de pedido...",
+            custom_id="reembolsoPedidoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.numero_caso = discord.ui.TextInput(
+            label="Número de Caso",
+            placeholder="Ingresa el número de caso...",
+            custom_id="reembolsoNumeroCasoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.monto = discord.ui.TextInput(
+            label="Monto a reembolsar",
+            placeholder="Ejemplo: 1000.00",
+            custom_id="reembolsoMontoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=20
+        )
+        self.motivo = discord.ui.TextInput(
+            label="Motivo del reembolso",
+            placeholder="Describe el motivo del reembolso...",
+            custom_id="reembolsoMotivoInput",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=1000
+        )
+        self.observaciones = discord.ui.TextInput(
+            label="Observaciones (opcional)",
+            placeholder="Observaciones adicionales...",
+            custom_id="reembolsoObservacionesInput",
+            style=discord.TextStyle.paragraph,
+            required=False,
+            max_length=1000
+        )
+        self.add_item(self.pedido)
+        self.add_item(self.numero_caso)
+        self.add_item(self.monto)
+        self.add_item(self.motivo)
+        self.add_item(self.observaciones)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        import utils.state_manager as state_manager
+        from utils.state_manager import generar_solicitud_id, cleanup_expired_states
+        cleanup_expired_states()
+        try:
+            user_id = str(interaction.user.id)
+            pending_data = state_manager.get_user_state(user_id)
+            if not pending_data or pending_data.get('type') != 'reembolsos':
+                await interaction.response.send_message('❌ Error: No hay un proceso de Reembolsos activo. Usa el botón del panel para empezar.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            pedido = self.pedido.value.strip()
+            numero_caso = self.numero_caso.value.strip()
+            monto = self.monto.value.strip()
+            motivo = self.motivo.value.strip()
+            observaciones = self.observaciones.value.strip()
+            tipo_reembolso = pending_data.get('tipoReembolso', 'OTROS')
+            solicitud_id = pending_data.get('solicitud_id') or generar_solicitud_id(user_id)
+            if not pedido or not numero_caso or not monto or not motivo:
+                await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from datetime import datetime
+            import pytz
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            if not config.SPREADSHEET_ID_REEMBOLSOS:
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Reembolsos no está configurado.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            if not hasattr(config, 'SHEET_RANGE_REEMBOLSOS'):
+                await interaction.response.send_message('❌ Error: La variable SHEET_RANGE_REEMBOLSOS no está configurada.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_REEMBOLSOS)
+            sheet_range = getattr(config, 'SHEET_RANGE_REEMBOLSOS', 'A:G')
+            hoja_nombre = None
+            if '!' in sheet_range:
+                partes = sheet_range.split('!')
+                if len(partes) == 2:
+                    hoja_nombre = partes[0].strip("'")
+                    sheet_range_puro = partes[1]
+                else:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+            else:
+                sheet_range_puro = sheet_range
+            if hoja_nombre:
+                sheet = spreadsheet.worksheet(hoja_nombre)
+            else:
+                sheet = spreadsheet.sheet1
+            rows = sheet.get(sheet_range_puro)
+            is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
+            if is_duplicate:
+                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Reembolsos.', ephemeral=True)
+                state_manager.delete_user_state(user_id)
+                return
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
+            agente_name = interaction.user.display_name
+            # Construir la fila según el header
+            header = rows[0] if rows else []
+            row_data = [
+                pedido,           # A - Número de Pedido
+                fecha_hora,       # B - Fecha
+                agente_name,      # C - Agente
+                numero_caso,      # D - Número de Caso
+                tipo_reembolso,   # E - Tipo de Reembolso
+                monto,            # F - Monto
+                motivo,           # G - Motivo
+                observaciones     # H - Observaciones
+            ]
+            # Ajustar la cantidad de columnas al header
+            if len(row_data) < len(header):
+                row_data += [''] * (len(header) - len(row_data))
+            elif len(row_data) > len(header):
+                row_data = row_data[:len(header)]
+            sheet.append_row(row_data)
+            confirmation_message = f"""✅ **Reembolso registrado exitosamente**\n\n📋 **Detalles del reembolso:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Reembolso:** {tipo_reembolso}\n• **Monto:** {monto}\n• **Motivo:** {motivo}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n"""
+            if observaciones:
+                confirmation_message += f"• **Observaciones:** {observaciones}\n"
+            confirmation_message += "\nEl reembolso ha sido guardado en Google Sheets y será monitoreado automáticamente."
+            await interaction.response.send_message(confirmation_message, ephemeral=True)
+            state_manager.delete_user_state(user_id)
+        except Exception as error:
+            print('Error general durante el procesamiento del modal de reembolsos (on_submit):', error)
+            await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
+            state_manager.delete_user_state(str(interaction.user.id))
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -659,6 +803,12 @@ class Modals(commands.Cog):
     async def solicitud_envios(self, ctx):
         """Muestra el modal de Solicitud de Envío"""
         modal = SolicitudEnviosModal()
+        await ctx.send_modal(modal)
+
+    @commands.command()
+    async def reembolso(self, ctx):
+        """Muestra el modal de Reembolso"""
+        modal = ReembolsoModal()
         await ctx.send_modal(modal)
 
 async def setup(bot):

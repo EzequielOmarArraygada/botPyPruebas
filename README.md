@@ -11,6 +11,7 @@ Este es un port en Python del bot original de Discord escrito en JavaScript. Uti
 - **Comando `/manual`**: Consulta al manual de procedimientos usando IA (Gemini)
 - **Verificación automática de errores**: Monitoreo periódico de hojas de Google Sheets
 - **Gestión de archivos**: Manejo de archivos adjuntos y carga a Google Drive
+- **Reembolsos**: Inicia el flujo de registro de reembolsos y guarda la información en Google Sheets
 
 ## Estructura del Proyecto
 
@@ -72,6 +73,7 @@ CS-Bot/
    TARGET_CHANNEL_ID_ENVIOS=your_envios_channel_id_here
    TARGET_CHANNEL_ID_CASOS=your_casos_channel_id_here
    TARGET_CHANNEL_ID_BUSCAR_CASO=your_buscar_caso_channel_id_here
+   TARGET_CHANNEL_ID_REEMBOLSOS=your_reembolsos_channel_id_here
 
    # Andreani API
    ANDREANI_API_AUTH=your_andreani_auth_header_here
@@ -85,6 +87,8 @@ CS-Bot/
    GOOGLE_SHEET_ID_CASOS=your_casos_sheet_id_here
    GOOGLE_SHEET_RANGE_CASOS=your_casos_sheet_range_here
    GOOGLE_SHEET_RANGE_CASOS_READ=your_casos_read_range_here
+   GOOGLE_SHEET_ID_REEMBOLSOS=your_reembolsos_sheet_id_here
+   GOOGLE_SHEET_RANGE_REEMBOLSOS=your_reembolsos_sheet_range_here
    GOOGLE_SHEET_SEARCH_SHEET_ID=your_search_sheet_id_here
    GOOGLE_SHEET_SEARCH_SHEETS=Sheet1,Sheet2,Sheet3
 
@@ -147,6 +151,7 @@ python redeploy.py
 - `/agregar-caso` - Inicia el registro de un nuevo caso
 - `/buscar-caso <pedido>` - Busca un caso por número de pedido
 - `/manual <pregunta>` - Consulta al manual de procedimientos
+- `/reembolsos` - Inicia el flujo de registro de reembolsos
 
 ## Notas Importantes
 
@@ -193,12 +198,14 @@ TARGET_CHANNEL_ID_BUSCAR_CASO=id_canal_buscar_caso
 TARGET_CHANNEL_ID_TAREAS=id_canal_tareas
 TARGET_CHANNEL_ID_TAREAS_REGISTRO=id_canal_registro_tareas
 TARGET_CHANNEL_ID_GUIA_COMANDOS=id_canal_guia_comandos
+TARGET_CHANNEL_ID_REEMBOLSOS=id_canal_reembolsos
 
 # Google Sheets IDs
 GOOGLE_SHEET_ID_FAC_A=id_hoja_factura_a
 GOOGLE_SHEET_ID_CASOS=id_hoja_casos
 GOOGLE_SHEET_ID_TAREAS=id_hoja_tareas
 GOOGLE_SHEET_SEARCH_SHEET_ID=id_hoja_busqueda
+GOOGLE_SHEET_ID_REEMBOLSOS=id_hoja_reembolsos
 
 # API de Andreani
 ANDREANI_API_AUTH=tu_header_de_autenticacion
@@ -234,6 +241,7 @@ Para que el panel de comandos funcione correctamente, asegúrate de configurar t
 - **Solicitudes de Envíos**: Maneja solicitudes sobre envíos (cambio de dirección, reenvío, etc.)
 - **Tracking**: Consulta el estado de envíos de Andreani
 - **Buscar Caso**: Busca casos por número de pedido
+- **Reembolsos**: Inicia el flujo de registro de reembolsos
 
 ### Solución de Problemas
 
@@ -265,6 +273,7 @@ Para que el panel de comandos funcione correctamente, asegúrate de configurar t
 - `/cambios-devoluciones`: Inicia registro de caso
 - `/buscar-caso <pedido>`: Busca caso por número de pedido
 - `/solicitudes-envios`: Inicia solicitud sobre envíos
+- `/reembolsos`: Inicia el flujo de registro de reembolsos
 
 ## Notas de Desarrollo
 
@@ -277,6 +286,7 @@ Para que el panel de comandos funcione correctamente, asegúrate de configurar t
 ### Variables Faltantes Agregadas
 - `TARGET_CHANNEL_ID_CASOS_ENVIOS`: Para el canal de solicitudes de envíos
 - `TARGET_CHANNEL_ID_GUIA_COMANDOS`: Para el canal de guía de comandos
+- `TARGET_CHANNEL_ID_REEMBOLSOS`: Para el canal de reembolsos
 
 ### Manejo de Errores
 Todos los botones del panel ahora incluyen:
