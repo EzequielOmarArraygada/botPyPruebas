@@ -742,3 +742,4 @@ class PanelComandos(commands.Cog):
         view = PanelComandosView()
         await canal.send(embed=embed, view=view)
         await interaction.response.send_message('Panel de comandos publicado correctamente.', ephemeral=True) 
+        
