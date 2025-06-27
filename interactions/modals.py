@@ -632,6 +632,7 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
                 numero_caso,      # D - Número de Caso
                 tipo_solicitud,   # E - Tipo de Solicitud
                 direccion_telefono, # F - Dirección/Teléfono/Datos
+                '',               # G - Referencia (Back Office)
                 '',               # H - Referencia (Back Office)
                 'Nadie',          # I - Agente Back
                 'No',             # J - Resuelto
