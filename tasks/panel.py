@@ -265,7 +265,16 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                         'type': 'tarea',
                         'timestamp': time.time()
                     })
-            # No enviar mensaje de confirmación en el canal del panel
+            
+            # Enviar confirmación al usuario
+            await interaction.response.send_message(
+                f'✅ **Tarea "Otra" registrada exitosamente**\n\n'
+                f'📋 **Detalles:**\n'
+                f'• **Observaciones:** {obs if obs else "Sin observaciones"}\n'
+                f'• **Fecha de inicio:** {inicio}\n'
+                f'• **Estado:** En proceso',
+                ephemeral=True
+            )
         except Exception as e:
             if "ya tiene una tarea activa" in str(e):
                 await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
