@@ -437,6 +437,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
         import config
         import utils.google_sheets as google_sheets
         from tasks.panel import crear_embed_tarea
+        from utils.state_manager import get_user_state
         from datetime import datetime
         import pytz
         import asyncio
@@ -502,7 +503,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                         return
                     await asyncio.sleep(1)  # Esperar 1 segundo antes del reintento
             
-            # 5. Actualizar el embed con estado finalizado y cantidad de casos
+            # 5. Crear el embed actualizado con estado finalizado y cantidad de casos
             print(f'[FINALIZAR TAREA] Creando embed actualizado...')
             embed = crear_embed_tarea(
                 interaction.user,
@@ -518,28 +519,38 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             # Crear una nueva view sin botones para tareas finalizadas
             view = discord.ui.View(timeout=None)
             
-            # 6. Intentar editar el mensaje original con reintentos
-            print(f'[FINALIZAR TAREA] Intentando actualizar embed...')
-            max_intentos_embed = 3
+            # 6. Buscar y actualizar el mensaje original de la tarea
+            print(f'[FINALIZAR TAREA] Buscando mensaje original...')
+            user_id = str(interaction.user.id)
+            estado = get_user_state(user_id)
+            message_id = estado.get('message_id')
+            channel_id = estado.get('channel_id')
+            
             embed_actualizado = False
-            
-            for intento in range(max_intentos_embed):
+            if message_id and channel_id:
                 try:
-                    await interaction.edit_original_response(embed=embed, view=view)
-                    print(f'[FINALIZAR TAREA] ✅ Embed actualizado exitosamente (intento {intento + 1})')
-                    embed_actualizado = True
-                    break
+                    canal = interaction.guild.get_channel(int(channel_id))
+                    if canal:
+                        mensaje = await canal.fetch_message(int(message_id))
+                        await mensaje.edit(embed=embed, view=view)
+                        embed_actualizado = True
+                        print(f'[FINALIZAR TAREA] ✅ Mensaje original actualizado exitosamente')
                 except Exception as e:
-                    print(f'[FINALIZAR TAREA] ❌ Error al actualizar embed (intento {intento + 1}): {e}')
-                    if intento < max_intentos_embed - 1:
-                        await asyncio.sleep(2)  # Esperar 2 segundos antes del reintento
-                    else:
-                        print(f'[FINALIZAR TAREA] ⚠️ No se pudo actualizar el embed después de {max_intentos_embed} intentos')
+                    print(f'[FINALIZAR TAREA] ❌ Error al editar el mensaje original: {e}')
             
-            # 7. Garantizar confirmación al usuario
+            # 7. Enviar confirmación al usuario
             if not confirmacion_enviada:
-                if not embed_actualizado:
-                    # Solo enviar confirmación si no se pudo actualizar el embed
+                if embed_actualizado:
+                    await interaction.followup.send(
+                        f'✅ **Tarea finalizada exitosamente**\n\n'
+                        f'📋 **Detalles:**\n'
+                        f'• **Tarea:** {datos_tarea["tarea"]}\n'
+                        f'• **Casos gestionados:** {cantidad}\n'
+                        f'• **Fecha de finalización:** {fecha_finalizacion}\n'
+                        f'• **Estado:** Finalizada',
+                        ephemeral=True
+                    )
+                else:
                     await interaction.followup.send(
                         f'✅ **Tarea finalizada exitosamente**\n\n'
                         f'📋 **Detalles:**\n'
@@ -553,21 +564,6 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
                 confirmacion_enviada = True
                 
             print(f'[FINALIZAR TAREA] ✅ Proceso completado exitosamente')
-            
-            # Al finalizar, buscar el mensaje original y editarlo
-            user_id = str(interaction.user.id)
-            estado = get_user_state(user_id)
-            message_id = estado.get('message_id')
-            channel_id = estado.get('channel_id')
-            if message_id and channel_id:
-                canal = interaction.guild.get_channel(channel_id)
-                if canal:
-                    try:
-                        mensaje = await canal.fetch_message(message_id)
-                        await mensaje.edit(embed=embed, view=view)
-                        embed_actualizado = True
-                    except Exception as e:
-                        print(f'[FINALIZAR TAREA] ❌ Error al editar el mensaje original por ID: {e}')
             
         except Exception as e:
             print(f'[FINALIZAR TAREA] ❌ ERROR CRÍTICO: {e}')
