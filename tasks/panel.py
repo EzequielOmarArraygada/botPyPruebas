@@ -477,6 +477,7 @@ class PanelComandosView(discord.ui.View):
         self.add_item(TrackingButton())
         self.add_item(BuscarCasoButton())
         self.add_item(ReembolsosButton())
+        self.add_item(CancelacionesButton())
 
 def safe_int(val):
     """Convierte un valor a entero de forma segura, retornando 0 si no es posible"""
@@ -813,6 +814,62 @@ class IniciarReembolsosButton(discord.ui.Button):
             await interaction.response.send_message('Por favor, selecciona el tipo de reembolso:', view=view, ephemeral=True)
         except Exception as e:
             print(f'Error en IniciarReembolsosButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class CancelacionesButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Cancelaciones', emoji='❌', style=discord.ButtonStyle.danger, custom_id='panel_cancelaciones')
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            from config import TARGET_CHANNEL_ID_CASOS_CANCELACION
+            canal_id = safe_int(TARGET_CHANNEL_ID_CASOS_CANCELACION)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    await interaction.response.defer()
+                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg = await canal.send(f'❌ {interaction.user.mention}, haz clic en el botón para iniciar el registro de una cancelación:', view=IniciarCancelacionesView(interaction.user.id))
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Cancelaciones.', ephemeral=True)
+            else:
+                await interaction.response.send_message('No se configuró el canal de Cancelaciones.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en CancelacionesButton: {e}')
+            if not interaction.response.is_done():
+                await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class IniciarCancelacionesView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.add_item(IniciarCancelacionesButton(user_id))
+
+class IniciarCancelacionesButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar registro de Cancelación', style=discord.ButtonStyle.danger, custom_id=f'init_cancelaciones_{user_id}')
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from utils.state_manager import set_user_state
+            set_user_state(str(interaction.user.id), {"type": "cancelaciones", "paso": 1}, "cancelaciones")
+            from interactions.select_menus import build_tipo_cancelacion_menu
+            view = build_tipo_cancelacion_menu()
+            await interaction.response.send_message('Por favor, selecciona el tipo de cancelación:', view=view, ephemeral=True)
+        except Exception as e:
+            print(f'Error en IniciarCancelacionesButton: {e}')
             await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class PanelComandos(commands.Cog):

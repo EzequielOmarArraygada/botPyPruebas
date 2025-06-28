@@ -860,6 +860,105 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
         if not interaction.response.is_done():
             await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
+class CancelacionModal(discord.ui.Modal, title='Registrar Cancelación'):
+    def __init__(self):
+        super().__init__(custom_id='cancelacionModal')
+        self.pedido = discord.ui.TextInput(
+            label="Número de Pedido",
+            placeholder="Ingresa el número de pedido...",
+            custom_id="cancelacionPedidoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.observaciones = discord.ui.TextInput(
+            label="Observaciones",
+            placeholder="Observaciones (opcional)",
+            custom_id="cancelacionObservacionesInput",
+            style=discord.TextStyle.paragraph,
+            required=False,
+            max_length=1000
+        )
+        self.add_item(self.pedido)
+        self.add_item(self.observaciones)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        import utils.state_manager as state_manager
+        from datetime import datetime
+        import pytz
+        try:
+            user_id = str(interaction.user.id)
+            pending_data = state_manager.get_user_state(user_id, "cancelaciones")
+            tipo_cancelacion = pending_data.get('tipoCancelacion', 'CANCELAR') if pending_data else 'CANCELAR'
+            pedido = self.pedido.value.strip()
+            observaciones = self.observaciones.value.strip()
+            agente = interaction.user.display_name
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_hora = now.strftime('%d/%m/%Y %H:%M:%S')
+            # Guardar en Google Sheets
+            from utils.google_sheets import initialize_google_sheets
+            if not config.GOOGLE_CREDENTIALS_JSON or not config.SPREADSHEET_ID_CASOS or not config.GOOGLE_SHEET_RANGE_CANCELACIONES:
+                await interaction.response.send_message('❌ Error de configuración para Google Sheets.', ephemeral=True)
+                return
+            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
+            sheet_range = config.GOOGLE_SHEET_RANGE_CANCELACIONES
+            hoja_nombre = None
+            if '!' in sheet_range:
+                partes = sheet_range.split('!')
+                if len(partes) == 2:
+                    hoja_nombre = partes[0].strip("'")
+                    sheet_range_puro = partes[1]
+                else:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+            else:
+                sheet_range_puro = sheet_range
+            if hoja_nombre:
+                sheet = spreadsheet.worksheet(hoja_nombre)
+            else:
+                sheet = spreadsheet.sheet1
+            rows = sheet.get(sheet_range_puro)
+            header = rows[0] if rows else []
+            def normaliza_columna(nombre):
+                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
+            # Buscar índices de columnas
+            idx_pedido = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('Número de pedido')), None)
+            idx_agente = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('Agente que carga')), None)
+            idx_fecha = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('FECHA')), None)
+            idx_solicitud = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('SOLICITUD')), None)
+            idx_frenado = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('FRENADO')), None)
+            idx_reembolso = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('REEMBOLSO')), None)
+            idx_agente_back = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('AGENTE BACK')), None)
+            idx_observaciones = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('OBSERVACIONES')), None)
+            # Preparar la fila
+            row_data = [''] * len(header)
+            if idx_pedido is not None:
+                row_data[idx_pedido] = pedido
+            if idx_agente is not None:
+                row_data[idx_agente] = agente
+            if idx_fecha is not None:
+                row_data[idx_fecha] = fecha_hora
+            if idx_solicitud is not None:
+                row_data[idx_solicitud] = tipo_cancelacion
+            if idx_frenado is not None:
+                row_data[idx_frenado] = 'Pendiente'
+            if idx_reembolso is not None:
+                row_data[idx_reembolso] = 'Pendiente'
+            if idx_agente_back is not None:
+                row_data[idx_agente_back] = 'Nadie'
+            if idx_observaciones is not None:
+                row_data[idx_observaciones] = observaciones
+            sheet.append_row(row_data)
+            confirmation_message = f"✅ **Cancelación registrada exitosamente**\n\n📋 **Detalles:**\n• **N° de Pedido:** {pedido}\n• **Tipo:** {tipo_cancelacion}\n• **Agente:** {agente}\n• **Fecha:** {fecha_hora}\n\nLa cancelación ha sido guardada en Google Sheets."
+            await interaction.response.send_message(confirmation_message, ephemeral=True)
+            state_manager.delete_user_state(user_id, "cancelaciones")
+        except Exception as error:
+            await interaction.response.send_message(f'❌ Hubo un error al procesar tu cancelación. Detalles: {error}', ephemeral=True)
+            state_manager.delete_user_state(str(interaction.user.id), "cancelaciones")
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -887,6 +986,12 @@ class Modals(commands.Cog):
     async def reembolso(self, ctx):
         """Muestra el modal de Reembolso"""
         modal = ReembolsoModal()
+        await ctx.send_modal(modal)
+
+    @commands.command()
+    async def cancelacion(self, ctx):
+        """Muestra el modal de Cancelación"""
+        modal = CancelacionModal()
         await ctx.send_modal(modal)
 
 async def setup(bot):

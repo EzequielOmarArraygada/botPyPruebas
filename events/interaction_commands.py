@@ -262,6 +262,35 @@ class InteractionCommands(commands.Cog):
         print("El bot está activo")
         await interaction.response.send_message("✅ El bot está activo.", ephemeral=True)
 
+    @maybe_guild_decorator()
+    @app_commands.command(name="cancelaciones", description="Inicia el registro de una cancelación")
+    async def cancelaciones(self, interaction: discord.Interaction):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
+        if hasattr(config, 'TARGET_CHANNEL_ID_CASOS_CANCELACION') and str(interaction.channel_id) != str(config.TARGET_CHANNEL_ID_CASOS_CANCELACION):
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en el canal <#{getattr(config, 'TARGET_CHANNEL_ID_CASOS_CANCELACION', '')}>.", ephemeral=True)
+            return
+        from interactions.select_menus import build_tipo_cancelacion_menu
+        from utils.state_manager import set_user_state, delete_user_state
+        try:
+            view = build_tipo_cancelacion_menu()
+            set_user_state(str(interaction.user.id), {"type": "cancelaciones", "paso": 1}, "cancelaciones")
+            await interaction.response.send_message(
+                content='Por favor, selecciona el tipo de cancelación:',
+                view=view,
+                ephemeral=True
+            )
+            print(f"Usuario {interaction.user} puesto en estado pendiente (cancelaciones, paso 1). Select Menu mostrado.")
+        except Exception as error:
+            print('Error al mostrar el Select Menu de Tipo de Cancelación:', error)
+            await interaction.response.send_message(
+                'Hubo un error al iniciar el formulario de registro de Cancelaciones. Por favor, inténtalo de nuevo.', ephemeral=True)
+            delete_user_state(str(interaction.user.id), "cancelaciones")
+
 def clean_html(raw_html):
     cleanr = re.compile('<.*?>')
     return re.sub(cleanr, '', raw_html).replace('&nbsp;', ' ').replace('&aacute;', 'á').replace('&eacute;', 'é').replace('&iacute;', 'í').replace('&oacute;', 'ó').replace('&uacute;', 'ú').replace('&ntilde;', 'ñ')
