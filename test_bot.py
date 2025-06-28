@@ -629,6 +629,43 @@ class TestAdditionalFeatures(unittest.TestCase):
         error_check_executed = True
         self.assertTrue(error_check_executed)
 
+class TestCancelacionesFlow(unittest.TestCase):
+    """Tests para el flujo de cancelaciones"""
+    def setUp(self):
+        self.user_id = "test_user_cancelaciones"
+        self.tipo = "cancelaciones"
+        from utils.state_manager import delete_user_state
+        delete_user_state(self.user_id, self.tipo)
+
+    def test_set_and_get_cancelaciones_state(self):
+        from utils.state_manager import set_user_state, get_user_state
+        test_data = {"type": "cancelaciones", "paso": 1, "tipoCancelacion": "CANCELAR"}
+        set_user_state(self.user_id, test_data, self.tipo)
+        retrieved = get_user_state(self.user_id, self.tipo)
+        self.assertEqual(retrieved, test_data)
+
+    @patch('utils.google_sheets.gspread')
+    @patch('utils.google_sheets.Credentials')
+    def test_guardar_cancelacion_en_sheet(self, mock_credentials, mock_gspread):
+        from utils.google_sheets import initialize_google_sheets
+        mock_creds_instance = Mock()
+        mock_credentials.from_service_account_info.return_value = mock_creds_instance
+        mock_client = Mock()
+        mock_gspread.authorize.return_value = mock_client
+        client = initialize_google_sheets('{"type": "service_account", "test": true}')
+        self.assertEqual(client, mock_client)
+
+    def test_modal_cancelacion_fields(self):
+        import asyncio
+        from interactions.modals import CancelacionModal
+        async def inner():
+            modal = CancelacionModal()
+            self.assertTrue(hasattr(modal, 'pedido'))
+            self.assertTrue(hasattr(modal, 'observaciones'))
+            self.assertEqual(modal.pedido.label, "Número de Pedido")
+            self.assertEqual(modal.observaciones.label, "Observaciones")
+        asyncio.run(inner())
+
 def run_tests():
     """Ejecutar todos los tests"""
     print("🧪 Iniciando Suite de Tests para CS-Bot")
@@ -650,7 +687,8 @@ def run_tests():
         TestErrorHandling,
         TestDateTimeHandling,
         TestIntegrationScenarios,
-        TestAdditionalFeatures
+        TestAdditionalFeatures,
+        TestCancelacionesFlow
     ]
     
     for test_class in test_classes:

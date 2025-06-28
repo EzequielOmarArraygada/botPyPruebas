@@ -14,6 +14,7 @@ Este es un bot de Discord desarrollado en Python para automatizar y gestionar pr
 
 ### 🎯 Gestión de Casos
 - **Comando `/cambios-devoluciones`**: Registro de casos con flujo de selección completo
+- **Comando `/cancelaciones`**: Registro de cancelaciones con selección de tipo y formulario
 - **Comando `/buscar-caso <pedido>`**: Búsqueda de casos por número de pedido en múltiples hojas
 - **Comando `/reembolsos`**: Inicia el flujo de registro de reembolsos
 
@@ -65,6 +66,7 @@ CS-Bot/
 | `/buscar-caso <pedido>` | Búsqueda de casos por pedido | Canal de búsqueda |
 | `/solicitudes-envios` | Solicitudes sobre envíos | Canal de casos |
 | `/reembolsos` | Registro de reembolsos | Canal de reembolsos |
+| `/cancelaciones` | Registro de cancelaciones (CANCELAR/SEGUIMIENTO) | Canal de cancelaciones |
 | `/manual <pregunta>` | Consulta al manual con IA | Cualquier canal |
 
 ### Comandos de Administración
