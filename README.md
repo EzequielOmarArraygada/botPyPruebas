@@ -1,119 +1,167 @@
-# CS-Bot (Python)
+# CS-Bot (Python) - Bot de Gestión Comercial
 
-Este es un port en Python del bot original de Discord escrito en JavaScript. Utiliza `discord.py` y otras librerías para replicar la funcionalidad original.
+Este es un bot de Discord desarrollado en Python para automatizar y gestionar procesos comerciales. Utiliza `discord.py` y múltiples APIs para proporcionar una solución integral de gestión empresarial.
 
-## Funcionalidades
+## 🚀 Funcionalidades Principales
 
-- **Comando `/factura-a`**: Registro de Factura A con formulario modal
-- **Comando `/tracking`**: Consulta de estado de envíos de Andreani
-- **Comando `/agregar-caso`**: Registro de casos con flujo de selección
-- **Comando `/buscar-caso`**: Búsqueda de casos por número de pedido
-- **Comando `/manual`**: Consulta al manual de procedimientos usando IA (Gemini)
+### 📋 Gestión de Documentos
+- **Comando `/factura-a`**: Registro de Factura A con formulario modal y carga de archivos adjuntos
+- **Comando `/manual <pregunta>`**: Consulta inteligente al manual de procedimientos usando IA (Gemini)
+
+### 📦 Gestión de Envíos
+- **Comando `/tracking <numero>`**: Consulta de estado de envíos de Andreani con historial completo
+- **Comando `/solicitudes-envios`**: Registro de solicitudes sobre envíos (cambio de dirección, reenvío, actualizar tracking)
+
+### 🎯 Gestión de Casos
+- **Comando `/cambios-devoluciones`**: Registro de casos con flujo de selección completo
+- **Comando `/buscar-caso <pedido>`**: Búsqueda de casos por número de pedido en múltiples hojas
+- **Comando `/reembolsos`**: Inicia el flujo de registro de reembolsos
+
+### ⏱️ Control de Tareas
+- **Panel de Tareas**: Sistema de registro y control de tiempo de actividades
+- **Comandos de Administración**: `/setup_panel_tareas` y `/setup_panel_comandos`
+
+### 🔄 Automatizaciones
 - **Verificación automática de errores**: Monitoreo periódico de hojas de Google Sheets
-- **Gestión de archivos**: Manejo de archivos adjuntos y carga a Google Drive
-- **Reembolsos**: Inicia el flujo de registro de reembolsos y guarda la información en Google Sheets
+- **Gestión de archivos**: Manejo automático de archivos adjuntos y carga a Google Drive
+- **Sistema de estados**: Gestión de flujos complejos con persistencia
 
-## Estructura del Proyecto
+## 🏗️ Estructura del Proyecto
 
 ```
 CS-Bot/
 ├── main.py                 # Archivo principal del bot
 ├── config.py              # Configuración y variables de entorno
 ├── requirements.txt       # Dependencias de Python
+├── redeploy.py           # Script para redeploy de comandos
+├── test_bot.py           # Suite de tests automatizados
 ├── events/               # Módulos de eventos de Discord
-│   ├── interaction_commands.py
-│   ├── interaction_selects.py
-│   ├── attachment_handler.py
-│   └── guild_member_add.py
+│   ├── interaction_commands.py  # Comandos slash principales
+│   ├── interaction_selects.py   # Manejo de menús de selección
+│   ├── attachment_handler.py    # Gestión de archivos adjuntos
+│   └── guild_member_add.py      # Eventos de miembros
 ├── interactions/         # Módulos de interacciones
-│   ├── modals.py
-│   └── select_menus.py
+│   ├── modals.py         # Formularios modales
+│   └── select_menus.py   # Menús de selección
+├── tasks/               # Módulos de tareas
+│   └── panel.py         # Panel de control de tareas
 └── utils/               # Utilidades y servicios
-    ├── google_sheets.py
-    ├── google_drive.py
-    ├── andreani.py
-    ├── qa_service.py
-    ├── manual_processor.py
-    └── state_manager.py
+    ├── google_sheets.py     # Integración con Google Sheets
+    ├── google_drive.py      # Integración con Google Drive
+    ├── andreani.py          # API de tracking de Andreani
+    ├── qa_service.py        # Servicio de IA para consultas
+    ├── manual_processor.py  # Procesamiento del manual
+    └── state_manager.py     # Gestión de estados de usuario
 ```
 
-## Instalación
+## 📋 Comandos Disponibles
 
-1. **Clona el repositorio**:
-   ```bash
-   git clone <repository-url>
-   cd CS-Bot
-   ```
+### Comandos de Usuario
+| Comando | Descripción | Canal Restringido |
+|---------|-------------|-------------------|
+| `/factura-a` | Registro de Factura A con formulario | Canal específico |
+| `/tracking <numero>` | Consulta estado de envío Andreani | Canal de envíos |
+| `/cambios-devoluciones` | Registro de casos comerciales | Canal de casos |
+| `/buscar-caso <pedido>` | Búsqueda de casos por pedido | Canal de búsqueda |
+| `/solicitudes-envios` | Solicitudes sobre envíos | Canal de casos |
+| `/reembolsos` | Registro de reembolsos | Canal de reembolsos |
+| `/manual <pregunta>` | Consulta al manual con IA | Cualquier canal |
 
-2. **Crea un entorno virtual** (recomendado):
-   ```bash
-   python -m venv myenv
-   # En Windows:
-   myenv\Scripts\activate
-   # En Linux/Mac:
-   source myenv/bin/activate
-   ```
+### Comandos de Administración
+| Comando | Descripción | Permisos |
+|---------|-------------|----------|
+| `/setup_panel_tareas` | Publica panel de tareas | Administrador |
+| `/setup_panel_comandos` | Publica panel de comandos | Administrador |
+| `/testping` | Verifica estado del bot | DM |
 
-3. **Instala las dependencias**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 🛠️ Instalación
 
-4. **Configura las variables de entorno**:
-   Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
+### Prerrequisitos
+- Python 3.8 o superior
+- Cuenta de Discord Developer
+- Proyecto en Google Cloud Platform
+- Token de API de Andreani
+- API Key de Gemini AI
 
-   ```env
-   # Discord Configuration
-   DISCORD_TOKEN=your_discord_bot_token_here
-   GUILD_ID=your_guild_id_here
-   HELP_CHANNEL_ID=your_help_channel_id_here
+### 1. Clonar el Repositorio
+```bash
+git clone <repository-url>
+cd CS-Bot
+```
 
-   # Discord Channel IDs
-   TARGET_CHANNEL_ID_FAC_A=your_factura_a_channel_id_here
-   TARGET_CHANNEL_ID_ENVIOS=your_envios_channel_id_here
-   TARGET_CHANNEL_ID_CASOS=your_casos_channel_id_here
-   TARGET_CHANNEL_ID_BUSCAR_CASO=your_buscar_caso_channel_id_here
-   TARGET_CHANNEL_ID_CASOS_REEMBOLSOS=your_reembolsos_channel_id_here
+### 2. Crear Entorno Virtual
+```bash
+python -m venv myenv
+# En Windows:
+myenv\Scripts\activate
+# En Linux/Mac:
+source myenv/bin/activate
+```
 
-   # Andreani API
-   ANDREANI_API_AUTH=your_andreani_auth_header_here
+### 3. Instalar Dependencias
+```bash
+pip install -r requirements.txt
+```
 
-   # Google Services
-   GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
+### 4. Configurar Variables de Entorno
+Crea un archivo `.env` en la raíz del proyecto:
 
-   # Google Sheets IDs
-   GOOGLE_SHEET_ID_FAC_A=your_factura_a_sheet_id_here
-   GOOGLE_SHEET_RANGE_FAC_A=your_factura_a_sheet_range_here
-   GOOGLE_SHEET_ID_CASOS=your_casos_sheet_id_here
-   GOOGLE_SHEET_RANGE_CASOS=your_casos_sheet_range_here
-   GOOGLE_SHEET_RANGE_CASOS_READ=your_casos_read_range_here
-   GOOGLE_SHEET_ID_REEMBOLSOS=your_reembolsos_sheet_id_here
-   GOOGLE_SHEET_RANGE_REEMBOLSOS=your_reembolsos_sheet_range_here
-   GOOGLE_SHEET_SEARCH_SHEET_ID=your_search_sheet_id_here
-   GOOGLE_SHEET_SEARCH_SHEETS=Sheet1,Sheet2,Sheet3
+```env
+# Discord Configuration
+DISCORD_TOKEN=your_discord_bot_token_here
+GUILD_ID=your_guild_id_here
+HELP_CHANNEL_ID=your_help_channel_id_here
 
-   # Google Drive
-   PARENT_DRIVE_FOLDER_ID=your_drive_folder_id_here
-   MANUAL_DRIVE_FILE_ID=your_manual_file_id_here
+# Discord Channel IDs (Obligatorios)
+TARGET_CHANNEL_ID_FAC_A=your_factura_a_channel_id_here
+TARGET_CHANNEL_ID_ENVIOS=your_envios_channel_id_here
+TARGET_CHANNEL_ID_CASOS=your_casos_channel_id_here
+TARGET_CHANNEL_ID_BUSCAR_CASO=your_buscar_caso_channel_id_here
+TARGET_CHANNEL_ID_CASOS_REEMBOLSOS=your_reembolsos_channel_id_here
+TARGET_CHANNEL_ID_TAREAS=your_tareas_channel_id_here
+TARGET_CHANNEL_ID_TAREAS_REGISTRO=your_registro_tareas_channel_id_here
+TARGET_CHANNEL_ID_GUIA_COMANDOS=your_guia_comandos_channel_id_here
 
-   # Gemini AI
-   GEMINI_API_KEY=your_gemini_api_key_here
+# Andreani API
+ANDREANI_API_AUTH=your_andreani_auth_header_here
 
-   # Discord Category
-   TARGET_CATEGORY_ID=your_target_category_id_here
+# Google Services
+GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
 
-   # Error Check Interval (in milliseconds, default: 4 hours)
-   ERROR_CHECK_INTERVAL_MS=14400000
-   ```
+# Google Sheets IDs
+GOOGLE_SHEET_ID_FAC_A=your_factura_a_sheet_id_here
+GOOGLE_SHEET_RANGE_FAC_A=your_factura_a_sheet_range_here
+GOOGLE_SHEET_ID_CASOS=your_casos_sheet_id_here
+GOOGLE_SHEET_RANGE_CASOS=your_casos_sheet_range_here
+GOOGLE_SHEET_RANGE_CASOS_READ=your_casos_read_range_here
+GOOGLE_SHEET_ID_REEMBOLSOS=your_reembolsos_sheet_id_here
+GOOGLE_SHEET_RANGE_REEMBOLSOS=your_reembolsos_sheet_range_here
+GOOGLE_SHEET_SEARCH_SHEET_ID=your_search_sheet_id_here
+GOOGLE_SHEET_SEARCH_SHEETS=Sheet1,Sheet2,Sheet3
+GOOGLE_SHEET_ID_TAREAS=your_tareas_sheet_id_here
 
-5. **Ejecuta el bot**:
-   ```bash
-   python main.py
-   ```
+# Google Drive
+PARENT_DRIVE_FOLDER_ID=your_drive_folder_id_here
+MANUAL_DRIVE_FILE_ID=your_manual_file_id_here
 
-## Redeploy de Comandos
+# Gemini AI
+GEMINI_API_KEY=your_gemini_api_key_here
 
-Si necesitas actualizar los comandos del bot o después de hacer cambios en el código, usa el script de redeploy:
+# Discord Category
+TARGET_CATEGORY_ID=your_target_category_id_here
+
+# Error Check Interval (in milliseconds, default: 4 hours)
+ERROR_CHECK_INTERVAL_MS=14400000
+```
+
+### 5. Ejecutar el Bot
+```bash
+python main.py
+```
+
+## 🔄 Redeploy de Comandos
+
+Para actualizar comandos después de cambios:
 
 ```bash
 python redeploy.py
@@ -124,13 +172,40 @@ python redeploy.py
 - Los botones del panel de tareas funcionarán correctamente después del redeploy
 - No uses el archivo `deploy_commands.py` (ya no existe), usa solo `redeploy.py`
 
-## Configuración Requerida
+## 🧪 Testing
+
+### Ejecutar Tests
+```bash
+python test_bot.py
+```
+
+### Cobertura de Tests
+Los tests cubren:
+- ✅ Configuración del bot
+- ✅ Comandos slash principales
+- ✅ Formularios modales
+- ✅ Integración con Google Sheets
+- ✅ API de Andreani
+- ✅ Gestión de estados
+- ✅ Manejo de archivos adjuntos
+- ✅ Panel de tareas
+- ✅ Validaciones de entrada
+
+### Tests Disponibles
+- **Test de Configuración**: Verifica variables de entorno
+- **Test de Comandos**: Valida funcionamiento de comandos slash
+- **Test de Modales**: Prueba formularios de entrada
+- **Test de APIs**: Verifica integraciones externas
+- **Test de Estados**: Valida gestión de flujos
+- **Test de Archivos**: Prueba manejo de adjuntos
+
+## 🔧 Configuración Requerida
 
 ### Discord Bot
 - Token del bot de Discord
 - IDs de los canales específicos para cada comando
 - ID del servidor (Guild)
-- Permisos necesarios: Send Messages, Use Slash Commands, Attach Files
+- Permisos necesarios: Send Messages, Use Slash Commands, Attach Files, Manage Messages
 
 ### Google Services
 - Cuenta de servicio de Google Cloud Platform
@@ -144,153 +219,95 @@ python redeploy.py
 ### Gemini AI
 - API Key de Google Gemini para el comando del manual
 
-## Comandos Disponibles
+## 📊 Flujos de Trabajo
 
-- `/factura-a` - Inicia el formulario de registro de Factura A
-- `/tracking <numero>` - Consulta el estado de un envío de Andreani
-- `/agregar-caso` - Inicia el registro de un nuevo caso
-- `/buscar-caso <pedido>` - Busca un caso por número de pedido
-- `/manual <pregunta>` - Consulta al manual de procedimientos
-- `/reembolsos` - Inicia el flujo de registro de reembolsos
+### Flujo de Factura A
+1. Usuario ejecuta `/factura-a`
+2. Se abre formulario modal
+3. Usuario completa datos
+4. Se valida duplicado en Google Sheets
+5. Se registra en hoja de cálculo
+6. Se solicita carga de archivos adjuntos
 
-## Notas Importantes
+### Flujo de Tracking
+1. Usuario ejecuta `/tracking <numero>`
+2. Se consulta API de Andreani
+3. Se procesa respuesta
+4. Se muestra estado actual e historial
 
-- Algunas funciones requieren credenciales específicas de Google API
-- El bot verifica automáticamente errores en las hojas de Google Sheets cada 4 horas por defecto
-- Los comandos están restringidos a canales específicos para mantener la organización
-- El manual se carga automáticamente desde Google Drive al iniciar el bot
-- Asegúrate de tener los permisos necesarios en Discord y Google
+### Flujo de Casos
+1. Usuario ejecuta `/cambios-devoluciones`
+2. Se muestra menú de selección
+3. Usuario selecciona tipo de solicitud
+4. Se abre formulario modal
+5. Se valida y registra en Google Sheets
 
-## Solución de Problemas
+## 🚨 Solución de Problemas
 
-1. **Error de credenciales de Google**: Verifica que el JSON de credenciales sea válido y tenga los permisos correctos
-2. **Bot no responde**: Verifica que el token de Discord sea correcto y el bot tenga los permisos necesarios
-3. **Comandos no aparecen**: Asegúrate de que el bot tenga permisos de aplicación en el servidor
-4. **Error en tracking**: Verifica que el token de Andreani sea válido y esté actualizado
+### Errores Comunes
 
-## Dependencias
+1. **Error de credenciales de Google**
+   ```
+   Error: GOOGLE_CREDENTIALS_JSON no es un JSON válido
+   ```
+   **Solución**: Verifica que el JSON de credenciales sea válido y tenga los permisos correctos
 
-- discord.py - Cliente de Discord
-- python-dotenv - Manejo de variables de entorno
-- gspread - API de Google Sheets
-- google-api-python-client - Cliente de Google APIs
-- requests - Cliente HTTP
-- pytz - Manejo de zonas horarias
-- google-generativeai - API de Gemini AI
+2. **Bot no responde**
+   ```
+   Error al conectar con Discord
+   ```
+   **Solución**: Verifica que el token de Discord sea correcto y el bot tenga los permisos necesarios
 
-## Configuración de Variables de Entorno
+3. **Comandos no aparecen**
+   ```
+   Error al sincronizar comandos
+   ```
+   **Solución**: Asegúrate de que el bot tenga permisos de aplicación en el servidor
 
-### Variables Requeridas
-```env
-# Discord
-DISCORD_TOKEN=tu_token_de_discord
-GUILD_ID=id_del_servidor
+4. **Error en tracking**
+   ```
+   Error al consultar la API de tracking de Andreani
+   ```
+   **Solución**: Verifica que el token de Andreani sea válido y esté actualizado
 
-# Google Services
-GOOGLE_CREDENTIALS_JSON={"tu":"json_de_credenciales"}
+### Logs y Debugging
+- El bot genera logs detallados en la consola
+- Usa `/testping` para verificar conectividad
+- Revisa la configuración con `check_config.py`
 
-# IDs de Canales (Obligatorios para el panel de comandos)
-TARGET_CHANNEL_ID_FAC_A=id_canal_factura_a
-TARGET_CHANNEL_ID_ENVIOS=id_canal_envios
-TARGET_CHANNEL_ID_CASOS=id_canal_casos
-TARGET_CHANNEL_ID_CASOS_ENVIOS=id_canal_solicitudes_envios
-TARGET_CHANNEL_ID_BUSCAR_CASO=id_canal_buscar_caso
-TARGET_CHANNEL_ID_TAREAS=id_canal_tareas
-TARGET_CHANNEL_ID_TAREAS_REGISTRO=id_canal_registro_tareas
-TARGET_CHANNEL_ID_GUIA_COMANDOS=id_canal_guia_comandos
-TARGET_CHANNEL_ID_CASOS_REEMBOLSOS=id_canal_reembolsos
+## 📚 Dependencias
 
-# Google Sheets IDs
-GOOGLE_SHEET_ID_FAC_A=id_hoja_factura_a
-GOOGLE_SHEET_ID_CASOS=id_hoja_casos
-GOOGLE_SHEET_ID_TAREAS=id_hoja_tareas
-GOOGLE_SHEET_SEARCH_SHEET_ID=id_hoja_busqueda
-GOOGLE_SHEET_RANGE_REEMBOLSOS=REEMBOLSOS!A:L
+| Paquete | Versión | Propósito |
+|---------|---------|-----------|
+| discord.py | Latest | Cliente de Discord |
+| python-dotenv | Latest | Manejo de variables de entorno |
+| gspread | Latest | API de Google Sheets |
+| google-api-python-client | Latest | Cliente de Google APIs |
+| google-auth-httplib2 | Latest | Autenticación Google |
+| google-auth-oauthlib | Latest | OAuth Google |
+| requests | Latest | Cliente HTTP |
+| pytz | Latest | Manejo de zonas horarias |
+| google-generativeai | Latest | API de Gemini AI |
 
-# API de Andreani
-ANDREANI_API_AUTH=tu_header_de_autenticacion
+## 🤝 Contribución
 
-# Gemini AI (Opcional)
-GEMINI_API_KEY=tu_api_key_gemini
-MANUAL_DRIVE_FILE_ID=id_archivo_manual
-```
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
-### Variables Opcionales
-```env
-# Categoría objetivo para comandos
-TARGET_CATEGORY_ID=id_categoria
+## 📄 Licencia
 
-# Intervalo de verificación de errores (en milisegundos, por defecto 4 horas)
-ERROR_CHECK_INTERVAL_MS=14400000
+Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
 
-# Canales de ayuda
-HELP_CHANNEL_ID=id_canal_ayuda
-```
+## 📞 Soporte
 
-## Panel de Comandos
+Para soporte técnico o preguntas:
+- Revisa la documentación
+- Ejecuta los tests para diagnosticar problemas
+- Verifica la configuración con `check_config.py`
 
-### Configuración Requerida
-Para que el panel de comandos funcione correctamente, asegúrate de configurar todas las variables de canal:
+---
 
-1. **TARGET_CHANNEL_ID_CASOS_ENVIOS**: Canal para solicitudes de envíos (cambio de dirección, reenvío, etc.)
-2. **TARGET_CHANNEL_ID_GUIA_COMANDOS**: Canal donde se publicará el panel de comandos
-
-### Comandos del Panel
-- **Factura A**: Inicia solicitud de facturación tipo A
-- **Cambios/Devoluciones**: Registra casos de cambios o devoluciones
-- **Solicitudes de Envíos**: Maneja solicitudes sobre envíos (cambio de dirección, reenvío, etc.)
-- **Tracking**: Consulta el estado de envíos de Andreani
-- **Buscar Caso**: Busca casos por número de pedido
-- **Reembolsos**: Inicia el flujo de registro de reembolsos
-
-### Solución de Problemas
-
-#### Error: "No se configuró el canal de Solicitudes de Envíos"
-- Asegúrate de que `TARGET_CHANNEL_ID_CASOS_ENVIOS` esté configurado en tu archivo `.env`
-- Verifica que el ID del canal sea correcto
-
-#### Error: "Error en la interacción"
-- Los errores de interacción han sido mejorados con manejo de excepciones
-- Verifica que todas las variables de configuración estén correctamente definidas
-- Revisa los logs del bot para más detalles sobre errores específicos
-
-## Instalación y Uso
-
-1. Clona el repositorio
-2. Instala las dependencias: `pip install -r requirements.txt`
-3. Configura las variables de entorno en un archivo `.env`
-4. Ejecuta el bot: `python main.py`
-
-## Comandos Disponibles
-
-### Comandos de Administración
-- `/setup_panel_comandos`: Publica el panel de comandos (solo admins)
-- `/setup_panel_tareas`: Publica el panel de tareas (solo admins)
-
-### Comandos de Usuario
-- `/factura-a`: Solicita registro de Factura A
-- `/tracking <numero>`: Consulta estado de envío
-- `/cambios-devoluciones`: Inicia registro de caso
-- `/buscar-caso <pedido>`: Busca caso por número de pedido
-- `/solicitudes-envios`: Inicia solicitud sobre envíos
-- `/reembolsos`: Inicia el flujo de registro de reembolsos
-
-## Notas de Desarrollo
-
-### Mejoras Recientes
-- ✅ Manejo mejorado de errores en botones del panel
-- ✅ Validación de variables de configuración
-- ✅ Mensajes de error más informativos
-- ✅ Corrección del botón "Solicitudes de Envíos"
-
-### Variables Faltantes Agregadas
-- `TARGET_CHANNEL_ID_CASOS_ENVIOS`: Para el canal de solicitudes de envíos
-- `TARGET_CHANNEL_ID_GUIA_COMANDOS`: Para el canal de guía de comandos
-- `TARGET_CHANNEL_ID_CASOS_REEMBOLSOS`: Para el canal de reembolsos
-
-### Manejo de Errores
-Todos los botones del panel ahora incluyen:
-- Try-catch blocks para capturar excepciones
-- Mensajes de error informativos para el usuario
-- Logs detallados para debugging
-- Validación de permisos y configuración 
+**Desarrollado para automatizar y optimizar procesos comerciales con Discord y Google Workspace.** 
