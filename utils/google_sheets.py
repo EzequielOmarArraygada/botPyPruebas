@@ -117,8 +117,13 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         if error_column_index is None or notified_column_index is None:
             return
         for i, row in enumerate(rows[1:], start=2):
-            error_value = str(row[error_column_index]).strip() if len(row) > error_column_index and row[error_column_index] else ''
-            notified_value = str(row[notified_column_index]).strip() if len(row) > notified_column_index and row[notified_column_index] else ''
+            if error_column_index is None or notified_column_index is None:
+                continue
+            # Type assertions para resolver errores de linter
+            error_idx = error_column_index  # type: int
+            notified_idx = notified_column_index  # type: int
+            error_value = str(row[error_idx]).strip() if len(row) > error_idx and row[error_idx] else ''
+            notified_value = str(row[notified_idx]).strip() if len(row) > notified_idx and row[notified_idx] else ''
             if error_value and not notified_value:
                 pedido = row[0] if len(row) > 0 else 'N/A'
                 fecha = row[1] if len(row) > 1 else 'N/A'
@@ -146,8 +151,19 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                     tz = pytz.timezone('America/Argentina/Buenos_Aires')
                     now = datetime.now(tz)
                     notification_timestamp = now.strftime('%d-%m-%Y %H:%M:%S')
+                    
+                    # Marcar la columna de notificación para evitar duplicados
+                    try:
+                        # Calcular la celda de la columna de notificación
+                        col_letter = chr(ord('A') + notified_idx)
+                        cell_address = f"{col_letter}{i}"
+                        sheet.update(cell_address, notification_timestamp)
+                        print(f"Columna de notificación marcada en {cell_address} con timestamp {notification_timestamp}")
+                    except Exception as update_error:
+                        print(f"Error al marcar columna de notificación: {update_error}")
+                        
                 except Exception as e:
-                    pass
+                    print(f"Error al enviar notificación: {e}")
     except Exception as error:
         pass
     print('Verificación de errores en Google Sheets completada.')
