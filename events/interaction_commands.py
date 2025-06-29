@@ -341,6 +341,92 @@ class InteractionCommands(commands.Cog):
             await interaction.response.send_message(
                 'Hubo un error al abrir el formulario de Pieza Faltante. Por favor, inténtalo de nuevo.', ephemeral=True)
 
+    @maybe_guild_decorator()
+    @app_commands.command(name="verificar-errores", description="Fuerza la verificación manual de errores en todas las hojas configuradas")
+    async def verificar_errores(self, interaction: discord.Interaction):
+        """Comando para forzar la verificación manual de errores"""
+        try:
+            # Verificar permisos (solo administradores)
+            try:
+                if not getattr(interaction.user, 'guild_permissions', None) or not interaction.user.guild_permissions.administrator:
+                    await interaction.response.send_message("❌ Solo los administradores pueden ejecutar este comando.", ephemeral=True)
+                    return
+            except AttributeError:
+                await interaction.response.send_message("❌ Solo los administradores pueden ejecutar este comando.", ephemeral=True)
+                return
+            
+            await interaction.response.send_message("🔍 Iniciando verificación manual de errores...", ephemeral=True)
+            
+            # Importar las funciones necesarias
+            import config
+            from utils.google_sheets import initialize_google_sheets, check_sheet_for_errors
+            
+            # Verificar configuración
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.followup.send("❌ Error: Las credenciales de Google no están configuradas.", ephemeral=True)
+                return
+            if not config.SPREADSHEET_ID_CASOS:
+                await interaction.followup.send("❌ Error: SPREADSHEET_ID_CASOS no está configurado.", ephemeral=True)
+                return
+            if not config.GUILD_ID:
+                await interaction.followup.send("❌ Error: GUILD_ID no está configurado.", ephemeral=True)
+                return
+            
+            # Inicializar Google Sheets
+            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
+            
+            # Contador de errores encontrados
+            total_errores = 0
+            hojas_verificadas = 0
+            
+            # Verificar cada rango/canal configurado
+            for sheet_range, channel_id in config.MAPA_RANGOS_ERRORES.items():
+                if not sheet_range or not channel_id:
+                    continue
+                
+                try:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+                    if '!' in sheet_range:
+                        partes = sheet_range.split('!')
+                        if len(partes) == 2:
+                            hoja_nombre = partes[0].strip("'")
+                            sheet_range_puro = partes[1]
+                    
+                    if hoja_nombre:
+                        sheet = spreadsheet.worksheet(hoja_nombre)
+                    else:
+                        sheet = spreadsheet.sheet1
+                    
+                    # Ejecutar verificación de errores
+                    await check_sheet_for_errors(
+                        self.bot,
+                        sheet,
+                        sheet_range,
+                        int(channel_id),
+                        int(config.GUILD_ID)
+                    )
+                    
+                    hojas_verificadas += 1
+                    await interaction.followup.send(f"✅ Verificada hoja: {hoja_nombre or '[default]'} (Rango: {sheet_range})", ephemeral=True)
+                    
+                except Exception as error:
+                    await interaction.followup.send(f"❌ Error al verificar {sheet_range}: {error}", ephemeral=True)
+            
+            # Resumen final
+            await interaction.followup.send(
+                f"🎯 **Verificación manual completada**\n\n"
+                f"📊 **Resumen:**\n"
+                f"• Hojas verificadas: {hojas_verificadas}\n"
+                f"• Rangos configurados: {len(config.MAPA_RANGOS_ERRORES)}\n\n"
+                f"✅ La verificación automática continuará ejecutándose cada {config.ERROR_CHECK_INTERVAL_MS / 1000} segundos.",
+                ephemeral=True
+            )
+            
+        except Exception as error:
+            await interaction.followup.send(f"❌ Error general en la verificación manual: {error}", ephemeral=True)
+
 def clean_html(raw_html):
     cleanr = re.compile('<.*?>')
     return re.sub(cleanr, '', raw_html).replace('&nbsp;', ' ').replace('&aacute;', 'á').replace('&eacute;', 'é').replace('&iacute;', 'í').replace('&oacute;', 'ó').replace('&uacute;', 'ú').replace('&ntilde;', 'ñ')
