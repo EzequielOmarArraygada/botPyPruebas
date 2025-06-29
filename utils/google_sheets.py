@@ -112,9 +112,9 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         idx_tipo = next((i for i, h in enumerate(header_row) if 'tipo' in normaliza_encabezado(h) or 'solicitud' in normaliza_encabezado(h)), None)
         idx_datos = next((i for i, h in enumerate(header_row) if 'contacto' in normaliza_encabezado(h) or 'datos' in normaliza_encabezado(h)), None)
         idx_error = next((i for i, h in enumerate(header_row) if 'error' == normaliza_encabezado(h)), None)
-        idx_agente = next((i for i, h in enumerate(header_row) if 'agente' in normaliza_encabezado(h)), None)
+        idx_notificado = next((i for i, h in enumerate(header_row) if 'errorenviocheck' == normaliza_encabezado(h)), None)
         error_column_index = idx_error
-        notified_column_index = idx_agente
+        notified_column_index = idx_notificado
         if error_column_index is None or notified_column_index is None:
             return
         for i, row in enumerate(rows[1:], start=2):
@@ -130,7 +130,7 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                 numero_caso = row[idx_caso] if (idx_caso is not None and isinstance(idx_caso, int) and idx_caso < len(row)) else 'N/A'
                 tipo_solicitud = row[idx_tipo] if (idx_tipo is not None and isinstance(idx_tipo, int) and idx_tipo < len(row)) else 'N/A'
                 datos_contacto = row[idx_datos] if (idx_datos is not None and isinstance(idx_datos, int) and idx_datos < len(row)) else 'N/A'
-                agente_name = row[idx_agente] if (idx_agente is not None and isinstance(idx_agente, int) and idx_agente < len(row)) else 'N/A'
+                agente_name = row[idx_notificado] if (idx_notificado is not None and isinstance(idx_notificado, int) and idx_notificado < len(row)) else 'N/A'
                 mention = agente_name
                 found_member = next((m for m in members if m.display_name == agente_name or m.name == agente_name), None)
                 if found_member:
