@@ -1084,6 +1084,131 @@ class ReclamosMLModal(discord.ui.Modal, title='Detalles del Reclamo ML'):
         if not interaction.response.is_done():
             await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
+class PiezaFaltanteModal(discord.ui.Modal, title='Registrar Pieza Faltante'):
+    def __init__(self):
+        super().__init__(custom_id='piezaFaltanteModal')
+        self.pedido = discord.ui.TextInput(
+            label="Número de pedido",
+            placeholder="Ingresa el número de pedido...",
+            custom_id="piezaFaltantePedidoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.id_wise = discord.ui.TextInput(
+            label="ID Caso Wise",
+            placeholder="Ingresa el ID de Wise...",
+            custom_id="piezaFaltanteWiseInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.pieza = discord.ui.TextInput(
+            label="Pieza faltante",
+            placeholder="Describe la pieza faltante...",
+            custom_id="piezaFaltantePiezaInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=200
+        )
+        self.sku = discord.ui.TextInput(
+            label="SKU del producto",
+            placeholder="Ingresa el SKU del producto...",
+            custom_id="piezaFaltanteSKUInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.observaciones = discord.ui.TextInput(
+            label="Observaciones (opcional)",
+            placeholder="Observaciones adicionales...",
+            custom_id="piezaFaltanteObservacionesInput",
+            style=discord.TextStyle.paragraph,
+            required=False,
+            max_length=1000
+        )
+        self.add_item(self.pedido)
+        self.add_item(self.id_wise)
+        self.add_item(self.pieza)
+        self.add_item(self.sku)
+        self.add_item(self.observaciones)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        import utils.state_manager as state_manager
+        from utils.state_manager import generar_solicitud_id, cleanup_expired_states
+        cleanup_expired_states()
+        try:
+            user_id = str(interaction.user.id)
+            solicitud_id = generar_solicitud_id(user_id)
+            pedido = self.pedido.value.strip()
+            id_wise = self.id_wise.value.strip()
+            pieza = self.pieza.value.strip()
+            sku = self.sku.value.strip()
+            observaciones = self.observaciones.value.strip()
+            if not pedido or not id_wise or not pieza or not sku:
+                await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
+                return
+            from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from datetime import datetime
+            import pytz
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                return
+            if not config.SPREADSHEET_ID_CASOS:
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
+                return
+            if not config.GOOGLE_SHEET_RANGE_PIEZA_FALTANTE:
+                await interaction.response.send_message('❌ Error: La variable GOOGLE_SHEET_RANGE_PIEZA_FALTANTE no está configurada.', ephemeral=True)
+                return
+            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
+            sheet_range = config.GOOGLE_SHEET_RANGE_PIEZA_FALTANTE
+            hoja_nombre = None
+            if '!' in sheet_range:
+                partes = sheet_range.split('!')
+                if len(partes) == 2:
+                    hoja_nombre = partes[0].strip("'")
+                    sheet_range_puro = partes[1]
+                else:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+            else:
+                sheet_range_puro = sheet_range
+            if hoja_nombre:
+                sheet = spreadsheet.worksheet(hoja_nombre)
+            else:
+                sheet = spreadsheet.sheet1
+            rows = sheet.get(sheet_range_puro)
+            # No se verifica duplicado porque puede haber varios casos por pedido
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
+            header = rows[0] if rows else []
+            row_data = [
+                pedido,        # Número de pedido
+                id_wise,      # ID WISE
+                pieza,        # Pieza faltante
+                sku,          # SKU del producto
+                fecha_hora,   # Fecha
+                observaciones # Observaciones
+            ]
+            # Ajustar la cantidad de columnas al header
+            if len(row_data) < len(header):
+                row_data += [''] * (len(header) - len(row_data))
+            elif len(row_data) > len(header):
+                row_data = row_data[:len(header)]
+            sheet.append_row(row_data)
+            confirmation_message = f"""✅ **Pieza faltante registrada exitosamente**\n\n📋 **Detalles:**\n• **N° de Pedido:** {pedido}\n• **ID Wise:** {id_wise}\n• **Pieza faltante:** {pieza}\n• **SKU:** {sku}\n• **Fecha:** {fecha_hora}\n"""
+            if observaciones:
+                confirmation_message += f"• **Observaciones:** {observaciones}\n"
+            confirmation_message += "\nEl caso ha sido guardado en Google Sheets y será monitoreado automáticamente."
+            await interaction.response.send_message(confirmation_message, ephemeral=True)
+        except Exception as error:
+            await interaction.response.send_message(f'❌ Hubo un error al procesar tu caso. Detalles: {error}', ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -1123,6 +1248,12 @@ class Modals(commands.Cog):
     async def reclamos_ml(self, ctx):
         """Muestra el modal de Reclamo ML"""
         modal = ReclamosMLModal()
+        await ctx.send_modal(modal)
+
+    @commands.command()
+    async def pieza_faltante(self, ctx):
+        """Muestra el modal de Pieza Faltante"""
+        modal = PiezaFaltanteModal()
         await ctx.send_modal(modal)
 
 async def setup(bot):

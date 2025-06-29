@@ -22,7 +22,7 @@ import unittest
 import json
 import os
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, PropertyMock, AsyncMock
 import asyncio
 from datetime import datetime
 import pytz
@@ -334,6 +334,33 @@ class TestModalForms(unittest.TestCase):
         self.assertEqual(modal.pedido.label, "Número de Pedido")
         self.assertEqual(modal.numero_caso.label, "Número de Caso")
         self.assertEqual(modal.datos_contacto.label, "Dirección / Teléfono / Otros Datos")
+
+    @patch('asyncio.get_running_loop')
+    def test_reclamos_ml_modal_creation(self, mock_get_loop):
+        """Test: Creación del modal de Reclamos ML"""
+        # Mock del event loop
+        mock_loop = Mock()
+        mock_future = Mock()
+        mock_loop.create_future.return_value = mock_future
+        mock_get_loop.return_value = mock_loop
+
+        from interactions.modals import ReclamosMLModal
+
+        modal = ReclamosMLModal()
+
+        # Verificar que el modal tiene los campos correctos
+        self.assertEqual(modal.title, 'Detalles del Reclamo ML')
+        self.assertEqual(len(modal.children), 3)  # 3 campos de texto
+
+        # Verificar campos específicos usando los atributos del modal
+        self.assertIsNotNone(modal.pedido)
+        self.assertIsNotNone(modal.direccion_datos)
+        self.assertIsNotNone(modal.observaciones)
+
+        # Verificar que los campos tienen las propiedades correctas
+        self.assertEqual(modal.pedido.label, "Número de Pedido")
+        self.assertEqual(modal.direccion_datos.label, "Dirección/Datos")
+        self.assertEqual(modal.observaciones.label, "Observaciones (opcional)")
 
 class TestCommandValidation(unittest.TestCase):
     """Tests para validación de comandos"""
@@ -666,6 +693,177 @@ class TestCancelacionesFlow(unittest.TestCase):
             self.assertEqual(modal.observaciones.label, "Observaciones")
         asyncio.run(inner())
 
+class TestIntegrationFlows(unittest.TestCase):
+    """Tests de integración para todos los flujos principales del bot"""
+
+    def setUp(self):
+        self.user_id = "test_user_integration"
+        self.display_name = "Test User"
+        self.mock_interaction = Mock()
+        self.mock_interaction.user.id = self.user_id
+        self.mock_interaction.user.display_name = self.display_name
+        self.mock_interaction.response.send_message = AsyncMock()
+        self.mock_interaction.response.send_modal = AsyncMock()
+        self.mock_interaction.followup.send = AsyncMock()
+        self.mock_interaction.channel_id = "123456789"
+        self.mock_interaction.channel = Mock()
+        self.mock_interaction.guild = Mock()
+        self.mock_interaction.guild.get_channel = Mock(return_value=self.mock_interaction.channel)
+
+    @patch('utils.google_sheets.initialize_google_sheets')
+    @patch('utils.google_sheets.check_if_pedido_exists', return_value=False)
+    def test_flujo_factura_a(self, mock_check, mock_init):
+        async def run():
+            from interactions.modals import FacturaAModal
+            modal = FacturaAModal()
+            type(modal.pedido).value = PropertyMock(return_value="PED123")
+            type(modal.caso).value = PropertyMock(return_value="CASO123")
+            type(modal.email).value = PropertyMock(return_value="test@email.com")
+            type(modal.descripcion).value = PropertyMock(return_value="Detalle de prueba")
+            with patch.object(self.mock_interaction, 'response') as mock_response:
+                mock_response.send_message = AsyncMock()
+                mock_response.send_modal = AsyncMock()
+                import config
+                config.GOOGLE_CREDENTIALS_JSON = '{}'
+                config.SPREADSHEET_ID_FAC_A = 'sheet_id'
+                modal.add_item = Mock()
+                await modal.on_submit(self.mock_interaction)
+        asyncio.run(run())
+
+    @patch('utils.google_sheets.initialize_google_sheets')
+    @patch('utils.google_sheets.check_if_pedido_exists', return_value=False)
+    def test_flujo_cambios_devoluciones(self, mock_check, mock_init):
+        async def run():
+            from interactions.modals import CasoModal
+            from utils.state_manager import set_user_state
+            set_user_state(self.user_id, {"type": "cambios_devoluciones", "paso": 2, "tipoSolicitud": "CAMBIO DEFECTUOSO"}, "cambios_devoluciones")
+            modal = CasoModal()
+            type(modal.pedido).value = PropertyMock(return_value="PED124")
+            type(modal.numero_caso).value = PropertyMock(return_value="CASO124")
+            type(modal.datos_contacto).value = PropertyMock(return_value="Dirección de prueba")
+            with patch.object(self.mock_interaction, 'response') as mock_response:
+                mock_response.send_message = AsyncMock()
+                mock_response.send_modal = AsyncMock()
+                import config
+                config.GOOGLE_CREDENTIALS_JSON = '{}'
+                config.SPREADSHEET_ID_CASOS = 'sheet_id'
+                modal.add_item = Mock()
+                await modal.on_submit(self.mock_interaction)
+        asyncio.run(run())
+
+    @patch('utils.google_sheets.initialize_google_sheets')
+    @patch('utils.google_sheets.check_if_pedido_exists', return_value=False)
+    def test_flujo_envios(self, mock_check, mock_init):
+        async def run():
+            from interactions.modals import SolicitudEnviosModal
+            from utils.state_manager import set_user_state
+            set_user_state(self.user_id, {"type": "solicitudes_envios", "paso": 2, "tipoSolicitud": "Reenvío"}, "solicitudes_envios")
+            modal = SolicitudEnviosModal()
+            type(modal.pedido).value = PropertyMock(return_value="PED125")
+            type(modal.numero_caso).value = PropertyMock(return_value="CASO125")
+            type(modal.direccion_telefono).value = PropertyMock(return_value="Dirección y Teléfono")
+            type(modal.observaciones).value = PropertyMock(return_value="Observaciones")
+            with patch.object(self.mock_interaction, 'response') as mock_response:
+                mock_response.send_message = AsyncMock()
+                mock_response.send_modal = AsyncMock()
+                import config
+                config.GOOGLE_CREDENTIALS_JSON = '{}'
+                config.SPREADSHEET_ID_CASOS = 'sheet_id'
+                config.GOOGLE_SHEET_RANGE_ENVIOS = 'RANGO!A:L'
+                modal.add_item = Mock()
+                await modal.on_submit(self.mock_interaction)
+        asyncio.run(run())
+
+    @patch('utils.google_sheets.initialize_google_sheets')
+    @patch('utils.google_sheets.check_if_pedido_exists', return_value=False)
+    def test_flujo_reembolsos(self, mock_check, mock_init):
+        async def run():
+            from interactions.modals import ReembolsoModal
+            from utils.state_manager import set_user_state
+            set_user_state(self.user_id, {"type": "reembolsos", "paso": 2, "tipoReembolso": "RETIRO (ZRE2)"}, "reembolso")
+            modal = ReembolsoModal()
+            type(modal.pedido).value = PropertyMock(return_value="PED126")
+            type(modal.zre).value = PropertyMock(return_value="ZRE2")
+            type(modal.tarjeta).value = PropertyMock(return_value="1234")
+            type(modal.correo).value = PropertyMock(return_value="test@email.com")
+            type(modal.observacion).value = PropertyMock(return_value="Observación")
+            with patch.object(self.mock_interaction, 'response') as mock_response:
+                mock_response.send_message = AsyncMock()
+                mock_response.send_modal = AsyncMock()
+                import config
+                config.GOOGLE_CREDENTIALS_JSON = '{}'
+                config.SPREADSHEET_ID_CASOS = 'sheet_id'
+                config.SHEET_RANGE_REEMBOLSOS = 'RANGO!A:L'
+                modal.add_item = Mock()
+                await modal.on_submit(self.mock_interaction)
+        asyncio.run(run())
+
+    @patch('utils.google_sheets.initialize_google_sheets')
+    @patch('utils.google_sheets.check_if_pedido_exists', return_value=False)
+    def test_flujo_cancelaciones(self, mock_check, mock_init):
+        async def run():
+            from interactions.modals import CancelacionModal
+            from utils.state_manager import set_user_state
+            set_user_state(self.user_id, {"type": "cancelaciones", "paso": 2, "tipoCancelacion": "CANCELAR"}, "cancelaciones")
+            modal = CancelacionModal()
+            type(modal.pedido).value = PropertyMock(return_value="PED127")
+            type(modal.observaciones).value = PropertyMock(return_value="Observaciones")
+            with patch.object(self.mock_interaction, 'response') as mock_response:
+                mock_response.send_message = AsyncMock()
+                mock_response.send_modal = AsyncMock()
+                import config
+                config.GOOGLE_CREDENTIALS_JSON = '{}'
+                config.SPREADSHEET_ID_CASOS = 'sheet_id'
+                config.GOOGLE_SHEET_RANGE_CANCELACIONES = 'RANGO!A:L'
+                modal.add_item = Mock()
+                await modal.on_submit(self.mock_interaction)
+        asyncio.run(run())
+
+    @patch('utils.google_sheets.initialize_google_sheets')
+    @patch('utils.google_sheets.check_if_pedido_exists', return_value=False)
+    def test_flujo_reclamos_ml(self, mock_check, mock_init):
+        async def run():
+            from interactions.modals import ReclamosMLModal
+            from utils.state_manager import set_user_state
+            set_user_state(self.user_id, {"type": "reclamos_ml", "paso": 2, "tipoReclamo": "Cambio dañado"}, "reclamos_ml")
+            modal = ReclamosMLModal()
+            type(modal.pedido).value = PropertyMock(return_value="PED128")
+            type(modal.direccion_datos).value = PropertyMock(return_value="Dirección reclamo")
+            type(modal.observaciones).value = PropertyMock(return_value="Observaciones reclamo")
+            with patch.object(self.mock_interaction, 'response') as mock_response:
+                mock_response.send_message = AsyncMock()
+                mock_response.send_modal = AsyncMock()
+                import config
+                config.GOOGLE_CREDENTIALS_JSON = '{}'
+                config.SPREADSHEET_ID_CASOS = 'sheet_id'
+                config.GOOGLE_SHEET_RANGE_RECLAMOS_ML = 'RANGO!A:L'
+                modal.add_item = Mock()
+                await modal.on_submit(self.mock_interaction)
+        asyncio.run(run())
+
+    @patch('utils.google_sheets.initialize_google_sheets')
+    @patch('utils.google_sheets.check_if_pedido_exists', return_value=False)
+    def test_flujo_pieza_faltante(self, mock_check, mock_init):
+        async def run():
+            from interactions.modals import PiezaFaltanteModal
+            modal = PiezaFaltanteModal()
+            from unittest.mock import PropertyMock
+            type(modal.pedido).value = PropertyMock(return_value="PED999")
+            type(modal.id_wise).value = PropertyMock(return_value="WISE123")
+            type(modal.pieza).value = PropertyMock(return_value="Tornillo")
+            type(modal.sku).value = PropertyMock(return_value="SKU123")
+            type(modal.observaciones).value = PropertyMock(return_value="Observación de prueba")
+            with patch.object(self.mock_interaction, 'response') as mock_response:
+                mock_response.send_message = AsyncMock()
+                mock_response.send_modal = AsyncMock()
+                import config
+                config.GOOGLE_CREDENTIALS_JSON = '{}'
+                config.SPREADSHEET_ID_CASOS = 'sheet_id'
+                config.GOOGLE_SHEET_RANGE_PIEZA_FALTANTE = 'RANGO!A:J'
+                modal.add_item = Mock()
+                await modal.on_submit(self.mock_interaction)
+        asyncio.run(run())
+
 def run_tests():
     """Ejecutar todos los tests"""
     print("🧪 Iniciando Suite de Tests para CS-Bot")
@@ -688,7 +886,8 @@ def run_tests():
         TestDateTimeHandling,
         TestIntegrationScenarios,
         TestAdditionalFeatures,
-        TestCancelacionesFlow
+        TestCancelacionesFlow,
+        TestIntegrationFlows
     ]
     
     for test_class in test_classes:

@@ -479,6 +479,7 @@ class PanelComandosView(discord.ui.View):
         self.add_item(ReembolsosButton())
         self.add_item(CancelacionesButton())
         self.add_item(ReclamosMLButton())
+        self.add_item(PiezaFaltanteButton())
 
 def safe_int(val):
     """Convierte un valor a entero de forma segura, retornando 0 si no es posible"""
@@ -927,6 +928,59 @@ class IniciarReclamosMLButton(discord.ui.Button):
             await interaction.response.send_message('Por favor, selecciona el tipo de reclamo:', view=view, ephemeral=True)
         except Exception as e:
             print(f'Error en IniciarReclamosMLButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class PiezaFaltanteButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Pieza Faltante', emoji='🧩', style=discord.ButtonStyle.primary, custom_id='panel_pieza_faltante')
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            from config import TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE
+            canal_id = safe_int(TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE or '0')
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    await interaction.response.defer()
+                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg = await canal.send(f'🧩 {interaction.user.mention}, haz clic en el botón para registrar una pieza faltante:', view=IniciarPiezaFaltanteView(interaction.user.id))
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Pieza Faltante.', ephemeral=True)
+            else:
+                await interaction.response.send_message('No se configuró el canal de Pieza Faltante.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en PiezaFaltanteButton: {e}')
+            if not interaction.response.is_done():
+                await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class IniciarPiezaFaltanteView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.add_item(IniciarPiezaFaltanteButton(user_id))
+
+class IniciarPiezaFaltanteButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Registrar pieza faltante', style=discord.ButtonStyle.primary, custom_id=f'init_pieza_faltante_{user_id}')
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from interactions.modals import PiezaFaltanteModal
+            await interaction.response.send_modal(PiezaFaltanteModal())
+        except Exception as e:
+            print(f'Error en IniciarPiezaFaltanteButton: {e}')
             await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class PanelComandos(commands.Cog):

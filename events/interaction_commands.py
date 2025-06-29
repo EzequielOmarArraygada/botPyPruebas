@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import config
 from utils.andreani import get_andreani_tracking
-from interactions.modals import FacturaAModal
+from interactions.modals import FacturaAModal, PiezaFaltanteModal
 import re
 from datetime import datetime
 
@@ -319,6 +319,27 @@ class InteractionCommands(commands.Cog):
             await interaction.response.send_message(
                 'Hubo un error al iniciar el formulario de Reclamos ML. Por favor, inténtalo de nuevo.', ephemeral=True)
             delete_user_state(str(interaction.user.id), "reclamos_ml")
+
+    @maybe_guild_decorator()
+    @app_commands.command(name="pieza-faltante", description="Registrar un caso de pieza faltante")
+    async def pieza_faltante(self, interaction: discord.Interaction):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
+        if hasattr(config, 'TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE') and str(interaction.channel_id) != str(getattr(config, 'TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE', '')):
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en el canal <#{getattr(config, 'TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE', '')}>.", ephemeral=True)
+            return
+        from interactions.modals import PiezaFaltanteModal
+        try:
+            modal = PiezaFaltanteModal()
+            await interaction.response.send_modal(modal)
+        except Exception as error:
+            print('Error al mostrar el modal de Pieza Faltante:', error)
+            await interaction.response.send_message(
+                'Hubo un error al abrir el formulario de Pieza Faltante. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 def clean_html(raw_html):
     cleanr = re.compile('<.*?>')
