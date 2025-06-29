@@ -30,29 +30,94 @@ Este es un bot de Discord desarrollado en Python para automatizar y gestionar pr
 ## 🏗️ Estructura del Proyecto
 
 ```
-CS-Bot/
-├── main.py                 # Archivo principal del bot
-├── config.py              # Configuración y variables de entorno
-├── requirements.txt       # Dependencias de Python
-├── redeploy.py           # Script para redeploy de comandos
-├── test_bot.py           # Suite de tests automatizados
-├── events/               # Módulos de eventos de Discord
-│   ├── interaction_commands.py  # Comandos slash principales
-│   ├── interaction_selects.py   # Manejo de menús de selección
-│   ├── attachment_handler.py    # Gestión de archivos adjuntos
-│   └── guild_member_add.py      # Eventos de miembros
-├── interactions/         # Módulos de interacciones
-│   ├── modals.py         # Formularios modales
-│   └── select_menus.py   # Menús de selección
-├── tasks/               # Módulos de tareas
-│   └── panel.py         # Panel de control de tareas
-└── utils/               # Utilidades y servicios
-    ├── google_sheets.py     # Integración con Google Sheets
-    ├── google_drive.py      # Integración con Google Drive
-    ├── andreani.py          # API de tracking de Andreani
-    ├── qa_service.py        # Servicio de IA para consultas
-    ├── manual_processor.py  # Procesamiento del manual
-    └── state_manager.py     # Gestión de estados de usuario
+botPyPruebas/
+├── main.py
+├── config.py
+├── requirements.txt
+├── redeploy.py
+├── events/
+│   ├── interaction_commands.py
+│   ├── interaction_selects.py
+│   ├── attachment_handler.py
+│   └── guild_member_add.py
+├── interactions/
+│   ├── modals.py
+│   └── select_menus.py
+├── tasks/
+│   └── panel.py
+├── utils/
+│   ├── google_sheets.py
+│   ├── google_drive.py
+│   ├── andreani.py
+│   ├── qa_service.py
+│   ├── manual_processor.py
+│   └── state_manager.py
+├── tests/
+│   ├── unit/           # Tests unitarios (lógica pura, helpers)
+│   ├── integration/    # Tests de integración (flujos completos, mocks)
+│   └── e2e/            # Checklist manual E2E
+└── README.md
+```
+
+## 🧪 Testing Profesional
+
+### Estructura de Tests
+- **Unitarios**: Prueban funciones y helpers de lógica pura (sin dependencias externas)
+- **Integración**: Prueban flujos completos entre módulos, usando mocks para Discord y Google Sheets
+- **E2E Manual**: Checklist detallado para simular la experiencia real de usuario en Discord
+
+### Ejecutar Tests Unitarios
+```bash
+python -m unittest discover tests/unit
+```
+
+### Ejecutar Tests de Integración
+```bash
+python -m unittest discover tests/integration
+```
+
+### Ejecutar Todos los Tests
+```bash
+# Ejecutar todos los tests unitarios e integración
+python -m unittest discover tests
+
+# Ejecutar un test específico
+python -m unittest tests.unit.test_state_manager
+python -m unittest tests.integration.test_case_flows
+```
+
+### Checklist Manual E2E
+- Archivo: `tests/e2e/checklist_manual_e2e.md`
+- Sigue este checklist antes de cada release importante para asegurar la calidad de los flujos críticos
+- Incluye verificación de todos los comandos, flujos de casos, panel de tareas y manejo de errores
+
+### Recomendaciones de Testing
+- Corre los tests unitarios e integración en cada cambio importante
+- Usa el checklist manual E2E para validar la experiencia real de usuario
+- Elimina o agrega archivos de test unitario según evolucione la lógica de cada módulo
+- Mantén los mocks actualizados cuando cambien las APIs externas
+
+### Cobertura de Tests
+- ✅ Lógica de negocio y helpers (`state_manager`, `utils`)
+- ✅ Flujos completos de casos, tareas y comandos
+- ✅ Validaciones y manejo de errores
+- ✅ Integración con Google Sheets y Discord (mockeado)
+- ✅ Checklist manual para experiencia real
+- ✅ Verificación de duplicados y escritura en hojas
+- ✅ Manejo de archivos adjuntos y Google Drive
+
+### Ejemplos de Tests
+```python
+# Test unitario - Lógica pura
+def test_state_manager_initialization():
+    manager = StateManager()
+    assert manager.get_user_state(123) is None
+
+# Test de integración - Flujo completo
+def test_factura_a_flow():
+    # Mock de Discord y Google Sheets
+    # Simula el flujo completo de registro
+    pass
 ```
 
 ## 📋 Comandos Disponibles
@@ -88,7 +153,7 @@ CS-Bot/
 ### 1. Clonar el Repositorio
 ```bash
 git clone <repository-url>
-cd CS-Bot
+cd botPyPruebas
 ```
 
 ### 2. Crear Entorno Virtual
@@ -106,51 +171,57 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configurar Variables de Entorno
-Crea un archivo `.env` en la raíz del proyecto:
+Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
 ```env
 # Discord Configuration
-DISCORD_TOKEN=your_discord_bot_token_here
-GUILD_ID=your_guild_id_here
-HELP_CHANNEL_ID=your_help_channel_id_here
+DISCORD_TOKEN=tu_discord_bot_token_aca
+GUILD_ID=tu_guild_id_aca
+HELP_CHANNEL_ID=tu_help_channel_id_aca
 
 # Discord Channel IDs (Obligatorios)
-TARGET_CHANNEL_ID_FAC_A=your_factura_a_channel_id_here
-TARGET_CHANNEL_ID_ENVIOS=your_envios_channel_id_here
-TARGET_CHANNEL_ID_CASOS=your_casos_channel_id_here
-TARGET_CHANNEL_ID_BUSCAR_CASO=your_buscar_caso_channel_id_here
-TARGET_CHANNEL_ID_CASOS_REEMBOLSOS=your_reembolsos_channel_id_here
-TARGET_CHANNEL_ID_TAREAS=your_tareas_channel_id_here
-TARGET_CHANNEL_ID_TAREAS_REGISTRO=your_registro_tareas_channel_id_here
-TARGET_CHANNEL_ID_GUIA_COMANDOS=your_guia_comandos_channel_id_here
+TARGET_CHANNEL_ID_FAC_A=tu_factura_a_channel_id_aca
+TARGET_CHANNEL_ID_ENVIOS=tu_envios_channel_id_aca
+TARGET_CHANNEL_ID_CASOS=tu_casos_channel_id_aca
+TARGET_CHANNEL_ID_BUSCAR_CASO=tu_buscar_caso_channel_id_aca
+TARGET_CHANNEL_ID_CASOS_REEMBOLSOS=tu_reembolsos_channel_id_aca
+TARGET_CHANNEL_ID_CASOS_CANCELACION=tu_cancelacion_channel_id_aca
+TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML=tu_reclamos_ml_channel_id_aca
+TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE=tu_pieza_faltante_channel_id_aca
+TARGET_CHANNEL_ID_TAREAS=tu_tareas_channel_id_aca
+TARGET_CHANNEL_ID_TAREAS_REGISTRO=tu_registro_tareas_channel_id_aca
+TARGET_CHANNEL_ID_GUIA_COMANDOS=tu_guia_comandos_channel_id_aca
 
 # Andreani API
-ANDREANI_API_AUTH=your_andreani_auth_header_here
+ANDREANI_API_AUTH=tu_andreani_auth_header_aca
 
 # Google Services
 GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
 
 # Google Sheets IDs
-GOOGLE_SHEET_ID_FAC_A=your_factura_a_sheet_id_here
-GOOGLE_SHEET_RANGE_FAC_A=your_factura_a_sheet_range_here
-GOOGLE_SHEET_ID_CASOS=your_casos_sheet_id_here
-GOOGLE_SHEET_RANGE_CASOS=your_casos_sheet_range_here
-GOOGLE_SHEET_RANGE_CASOS_READ=your_casos_read_range_here
-GOOGLE_SHEET_ID_REEMBOLSOS=your_reembolsos_sheet_id_here
-GOOGLE_SHEET_RANGE_REEMBOLSOS=your_reembolsos_sheet_range_here
-GOOGLE_SHEET_SEARCH_SHEET_ID=your_search_sheet_id_here
+GOOGLE_SHEET_ID_FAC_A=tu_factura_a_sheet_id_aca
+GOOGLE_SHEET_RANGE_FAC_A=tu_factura_a_sheet_range_aca
+GOOGLE_SHEET_ID_CASOS=tu_casos_sheet_id_aca
+GOOGLE_SHEET_RANGE_CASOS=tu_casos_sheet_range_aca
+GOOGLE_SHEET_RANGE_CASOS_READ=tu_casos_read_range_aca
+GOOGLE_SHEET_ID_REEMBOLSOS=tu_reembolsos_sheet_id_aca
+GOOGLE_SHEET_RANGE_REEMBOLSOS=tu_reembolsos_sheet_range_aca
+GOOGLE_SHEET_RANGE_CANCELACIONES=cancelaciones_sheet_range_aca
+GOOGLE_SHEET_RANGE_RECLAMOS_ML=reclamo_ml_sheet_range_aca
+GOOGLE_SHEET_RANGE_PIEZA_FALTANTE=pieza_faltante_sheet_range_aca
+GOOGLE_SHEET_SEARCH_SHEET_ID=tu_search_sheet_id_aca
 GOOGLE_SHEET_SEARCH_SHEETS=Sheet1,Sheet2,Sheet3
-GOOGLE_SHEET_ID_TAREAS=your_tareas_sheet_id_here
+GOOGLE_SHEET_ID_TAREAS=tu_tareas_sheet_id_aca
 
 # Google Drive
-PARENT_DRIVE_FOLDER_ID=your_drive_folder_id_here
-MANUAL_DRIVE_FILE_ID=your_manual_file_id_here
+PARENT_DRIVE_FOLDER_ID=tu_drive_folder_id_aca
+MANUAL_DRIVE_FILE_ID=tu_manual_file_id_aca
 
 # Gemini AI
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=tu_gemini_api_key_aca
 
 # Discord Category
-TARGET_CATEGORY_ID=your_target_category_id_here
+TARGET_CATEGORY_ID=tu_target_category_id_aca
 
 # Error Check Interval (in milliseconds, default: 4 hours)
 ERROR_CHECK_INTERVAL_MS=14400000
@@ -164,7 +235,6 @@ python main.py
 ## 🔄 Redeploy de Comandos
 
 Para actualizar comandos después de cambios:
-
 ```bash
 python redeploy.py
 ```
@@ -172,34 +242,6 @@ python redeploy.py
 **⚠️ Importante**: 
 - Este script sincroniza los comandos slash y registra las views persistentes
 - Los botones del panel de tareas funcionarán correctamente después del redeploy
-- No uses el archivo `deploy_commands.py` (ya no existe), usa solo `redeploy.py`
-
-## 🧪 Testing
-
-### Ejecutar Tests
-```bash
-python test_bot.py
-```
-
-### Cobertura de Tests
-Los tests cubren:
-- ✅ Configuración del bot
-- ✅ Comandos slash principales
-- ✅ Formularios modales
-- ✅ Integración con Google Sheets
-- ✅ API de Andreani
-- ✅ Gestión de estados
-- ✅ Manejo de archivos adjuntos
-- ✅ Panel de tareas
-- ✅ Validaciones de entrada
-
-### Tests Disponibles
-- **Test de Configuración**: Verifica variables de entorno
-- **Test de Comandos**: Valida funcionamiento de comandos slash
-- **Test de Modales**: Prueba formularios de entrada
-- **Test de APIs**: Verifica integraciones externas
-- **Test de Estados**: Valida gestión de flujos
-- **Test de Archivos**: Prueba manejo de adjuntos
 
 ## 🔧 Configuración Requerida
 
@@ -276,6 +318,7 @@ Los tests cubren:
 - El bot genera logs detallados en la consola
 - Usa `/testping` para verificar conectividad
 - Revisa la configuración con `check_config.py`
+- Ejecuta los tests para diagnosticar problemas
 
 ## 📚 Dependencias
 
@@ -295,9 +338,16 @@ Los tests cubren:
 
 1. Fork el proyecto
 2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+3. Ejecuta los tests para asegurar que todo funciona
+4. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+5. Push a la rama (`git push origin feature/AmazingFeature`)
+6. Abre un Pull Request
+
+### Guías de Contribución
+- Mantén los tests actualizados
+- Documenta nuevos comandos y flujos
+- Sigue las convenciones de código existentes
+- Ejecuta el checklist E2E antes de hacer merge
 
 ## 📄 Licencia
 
@@ -309,7 +359,21 @@ Para soporte técnico o preguntas:
 - Revisa la documentación
 - Ejecuta los tests para diagnosticar problemas
 - Verifica la configuración con `check_config.py`
+- Consulta el checklist E2E para problemas de UI
 
 ---
+
+## 📈 Buenas Prácticas
+- Mantén los tests actualizados a medida que evoluciona el bot
+- Usa el checklist E2E antes de releases
+- Documenta nuevos flujos y comandos en este README
+- Elimina archivos de test unitario dummy si el módulo no tiene lógica propia
+- Ejecuta tests automáticos antes de cada commit
+- Mantén las variables de entorno seguras y actualizadas
+
+---
+
+**¿Dudas o sugerencias?**
+- Abre un issue o contacta al equipo de desarrollo
 
 **Desarrollado para automatizar y optimizar procesos comerciales con Discord y Google Workspace.** 
