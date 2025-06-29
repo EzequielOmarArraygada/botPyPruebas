@@ -365,19 +365,9 @@ class TareaControlView(discord.ui.View):
 
 class PausarReanudarButton(discord.ui.Button):
     def __init__(self, user_id=None, tarea_id=None, estado_actual="en proceso"):
-        if user_id and tarea_id:
-            if estado_actual.lower() == "en proceso":
-                label = "⏸️ Pausar"
-                style = discord.ButtonStyle.secondary
-                custom_id = f"pausar_{user_id}_{tarea_id}"
-            else:
-                label = "▶️ Reanudar"
-                style = discord.ButtonStyle.success
-                custom_id = f"reanudar_{user_id}_{tarea_id}"
-        else:
-            label = "⏸️ Pausar"
-            style = discord.ButtonStyle.secondary
-            custom_id = "pausar_persistent"
+        label = "⏸️ Pausar" if estado_actual.lower() == "en proceso" else "▶️ Reanudar"
+        style = discord.ButtonStyle.secondary if estado_actual.lower() == "en proceso" else discord.ButtonStyle.success
+        custom_id = f"tarea_{user_id}_{tarea_id}"
         super().__init__(label=label, style=style, custom_id=custom_id)
         self.user_id = user_id
         self.tarea_id = tarea_id
@@ -386,13 +376,10 @@ class PausarReanudarButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         # Extraer user_id y tarea_id del custom_id si no están en self
         if not self.user_id or not self.tarea_id:
-            if self.custom_id == 'pausar_persistent':
-                await interaction.response.send_message('❌ Este botón no está asociado a una tarea específica.', ephemeral=True)
-                return
-            match = re.match(r'(pausar|reanudar)_(\d+)_(.+)', self.custom_id)
+            match = re.match(r'tarea_(\d+)_(.+)', self.custom_id)
             if match:
-                self.user_id = match.group(2)
-                self.tarea_id = match.group(3)
+                self.user_id = match.group(1)
+                self.tarea_id = match.group(2)
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
