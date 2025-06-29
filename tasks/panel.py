@@ -356,22 +356,32 @@ def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado
     return embed
 
 class TareaControlView(discord.ui.View):
-    def __init__(self, user_id=None, tarea_id=None):
+    def __init__(self, user_id=None, tarea_id=None, estado_actual="en proceso"):
         super().__init__(timeout=None)
         self.user_id = user_id
         self.tarea_id = tarea_id
-        self.add_item(PausarReanudarButton(user_id, tarea_id))
+        self.add_item(PausarReanudarButton(user_id, tarea_id, estado_actual))
         self.add_item(FinalizarButton(user_id, tarea_id))
 
 class PausarReanudarButton(discord.ui.Button):
-    def __init__(self, user_id=None, tarea_id=None):
+    def __init__(self, user_id=None, tarea_id=None, estado_actual="en proceso"):
         if user_id and tarea_id:
-            custom_id = f'pausar_{user_id}_{tarea_id}'
+            if estado_actual.lower() == "en proceso":
+                label = "⏸️ Pausar"
+                style = discord.ButtonStyle.secondary
+                custom_id = f"pausar_{user_id}_{tarea_id}"
+            else:
+                label = "▶️ Reanudar"
+                style = discord.ButtonStyle.success
+                custom_id = f"reanudar_{user_id}_{tarea_id}"
         else:
-            custom_id = 'pausar_persistent'
-        super().__init__(label='⏸️ Pausar', style=discord.ButtonStyle.secondary, custom_id=custom_id)
+            label = "⏸️ Pausar"
+            style = discord.ButtonStyle.secondary
+            custom_id = "pausar_persistent"
+        super().__init__(label=label, style=style, custom_id=custom_id)
         self.user_id = user_id
         self.tarea_id = tarea_id
+        self.estado_actual = estado_actual
 
     async def callback(self, interaction: discord.Interaction):
         # Extraer user_id y tarea_id del custom_id si no están en self
@@ -379,10 +389,10 @@ class PausarReanudarButton(discord.ui.Button):
             if self.custom_id == 'pausar_persistent':
                 await interaction.response.send_message('❌ Este botón no está asociado a una tarea específica.', ephemeral=True)
                 return
-            match = re.match(r'pausar_(\d+)_(.+)', self.custom_id)
+            match = re.match(r'(pausar|reanudar)_(\d+)_(.+)', self.custom_id)
             if match:
-                self.user_id = match.group(1)
-                self.tarea_id = match.group(2)
+                self.user_id = match.group(2)
+                self.tarea_id = match.group(3)
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
@@ -405,7 +415,7 @@ class PausarReanudarButton(discord.ui.Button):
                 from tasks.panel import crear_embed_tarea, TareaControlView
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.orange()
-                view = TareaControlView(self.user_id, self.tarea_id)
+                view = TareaControlView(self.user_id, self.tarea_id, 'pausada')
                 await interaction.response.edit_message(embed=embed, view=view)
                 msg = await interaction.followup.send('✅ Tarea pausada correctamente.')
                 await asyncio.sleep(20)
@@ -420,7 +430,7 @@ class PausarReanudarButton(discord.ui.Button):
                 from tasks.panel import crear_embed_tarea, TareaControlView
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.green()
-                view = TareaControlView(self.user_id, self.tarea_id)
+                view = TareaControlView(self.user_id, self.tarea_id, 'en proceso')
                 await interaction.response.edit_message(embed=embed, view=view)
                 msg = await interaction.followup.send('✅ Tarea reanudada correctamente.')
                 await asyncio.sleep(20)
