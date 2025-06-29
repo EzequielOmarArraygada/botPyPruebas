@@ -157,7 +157,8 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                         # Calcular la celda de la columna de notificación
                         col_letter = chr(ord('A') + notified_idx)
                         cell_address = f"{col_letter}{i}"
-                        sheet.update(cell_address, notification_timestamp)
+                        # Usar el formato correcto para actualizar una celda
+                        sheet.update_acell(cell_address, notification_timestamp)
                         print(f"Columna de notificación marcada en {cell_address} con timestamp {notification_timestamp}")
                     except Exception as update_error:
                         print(f"Error al marcar columna de notificación: {update_error}")
