@@ -105,6 +105,36 @@ class TipoCancelacionView(discord.ui.View):
 def build_tipo_cancelacion_menu():
     return TipoCancelacionView()
 
+class TipoReclamosMLSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label='Cambio dañado', value='Cambio dañado'),
+            discord.SelectOption(label='Retiro arrepentimiento', value='Retiro arrepentimiento'),
+            discord.SelectOption(label='Reenvío', value='Reenvío'),
+            discord.SelectOption(label='Cambio de dirección', value='Cambio de dirección'),
+            discord.SelectOption(label='CANCELAR', value='CANCELAR'),
+            discord.SelectOption(label='NC POR FACTURA B', value='NC POR FACTURA B'),
+            discord.SelectOption(label='CAMBIO INCORRECTO', value='CAMBIO INCORRECTO'),
+            discord.SelectOption(label='Otros', value='Otros'),
+        ]
+        super().__init__(placeholder='Selecciona el tipo de reclamo...', min_values=1, max_values=1, options=options, custom_id='reclamosMLTipoSelect')
+
+    async def callback(self, interaction: discord.Interaction):
+        from utils.state_manager import set_user_state
+        user_id = str(interaction.user.id)
+        selected_tipo = self.values[0]
+        set_user_state(user_id, {"type": "reclamos_ml", "paso": 2, "tipoReclamo": selected_tipo}, "reclamos_ml")
+        from interactions.modals import ReclamosMLModal
+        await interaction.response.send_modal(ReclamosMLModal())
+
+class TipoReclamosMLView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=120)
+        self.add_item(TipoReclamosMLSelect())
+
+def build_tipo_reclamos_ml_menu():
+    return TipoReclamosMLView()
+
 class SelectMenus(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

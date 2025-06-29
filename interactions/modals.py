@@ -959,6 +959,131 @@ class CancelacionModal(discord.ui.Modal, title='Registrar Cancelación'):
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu cancelación. Detalles: {error}', ephemeral=True)
             state_manager.delete_user_state(str(interaction.user.id), "cancelaciones")
 
+class ReclamosMLModal(discord.ui.Modal, title='Detalles del Reclamo ML'):
+    def __init__(self):
+        super().__init__(custom_id='reclamosMLModal')
+        self.pedido = discord.ui.TextInput(
+            label="Número de Pedido",
+            placeholder="Ingresa el número de pedido...",
+            custom_id="reclamosMLPedidoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.direccion_datos = discord.ui.TextInput(
+            label="Dirección/Datos",
+            placeholder="Ingresa la dirección y/o datos relevantes...",
+            custom_id="reclamosMLDireccionDatosInput",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=1000
+        )
+        self.observaciones = discord.ui.TextInput(
+            label="Observaciones (opcional)",
+            placeholder="Observaciones adicionales...",
+            custom_id="reclamosMLObservacionesInput",
+            style=discord.TextStyle.paragraph,
+            required=False,
+            max_length=1000
+        )
+        self.add_item(self.pedido)
+        self.add_item(self.direccion_datos)
+        self.add_item(self.observaciones)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        import utils.state_manager as state_manager
+        from utils.state_manager import generar_solicitud_id, cleanup_expired_states
+        cleanup_expired_states()
+        try:
+            user_id = str(interaction.user.id)
+            pending_data = state_manager.get_user_state(user_id, "reclamos_ml")
+            if not pending_data or pending_data.get('type') != 'reclamos_ml':
+                await interaction.response.send_message('❌ Error: No hay un proceso de Reclamos ML activo. Usa /reclamos-ml para empezar.', ephemeral=True)
+                state_manager.delete_user_state(user_id, "reclamos_ml")
+                return
+            pedido = self.pedido.value.strip()
+            direccion_datos = self.direccion_datos.value.strip()
+            observaciones = self.observaciones.value.strip()
+            tipo_reclamo = pending_data.get('tipoReclamo', 'OTROS')
+            solicitud_id = pending_data.get('solicitud_id') or generar_solicitud_id(user_id)
+            if not pedido or not direccion_datos:
+                await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
+                state_manager.delete_user_state(user_id, "reclamos_ml")
+                return
+            from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from datetime import datetime
+            import pytz
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                state_manager.delete_user_state(user_id, "reclamos_ml")
+                return
+            if not config.SPREADSHEET_ID_CASOS:
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
+                state_manager.delete_user_state(user_id, "reclamos_ml")
+                return
+            if not hasattr(config, 'GOOGLE_SHEET_RANGE_RECLAMOS_ML'):
+                await interaction.response.send_message('❌ Error: La variable GOOGLE_SHEET_RANGE_RECLAMOS_ML no está configurada.', ephemeral=True)
+                state_manager.delete_user_state(user_id, "reclamos_ml")
+                return
+            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
+            sheet_range = getattr(config, 'GOOGLE_SHEET_RANGE_RECLAMOS_ML', 'SOLICITUDES CON RECLAMO ABIERTO 2025 ML!A:L')
+            hoja_nombre = None
+            if '!' in sheet_range:
+                partes = sheet_range.split('!')
+                if len(partes) == 2:
+                    hoja_nombre = partes[0].strip("'")
+                    sheet_range_puro = partes[1]
+                else:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+            else:
+                sheet_range_puro = sheet_range
+            if hoja_nombre:
+                sheet = spreadsheet.worksheet(hoja_nombre)
+            else:
+                sheet = spreadsheet.sheet1
+            rows = sheet.get(sheet_range_puro)
+            is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
+            if is_duplicate:
+                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Reclamos ML.', ephemeral=True)
+                state_manager.delete_user_state(user_id, "reclamos_ml")
+                return
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
+            # Construir la fila según el header
+            header = rows[0] if rows else []
+            row_data = [
+                pedido,           # A - Número de Pedido
+                fecha_hora,       # B - Fecha
+                tipo_reclamo,     # C - Solicitud
+                direccion_datos,  # D - Dirección/Datos
+                '',               # E - Referencia
+                'Nadie',          # F - Agente
+                'No',             # G - Resuelto
+                observaciones     # H - Observaciones
+            ]
+            # Ajustar la cantidad de columnas al header
+            if len(row_data) < len(header):
+                row_data += [''] * (len(header) - len(row_data))
+            elif len(row_data) > len(header):
+                row_data = row_data[:len(header)]
+            sheet.append_row(row_data)
+            confirmation_message = f"""✅ **Reclamo ML registrado exitosamente**\n\n📋 **Detalles del reclamo:**\n• **N° de Pedido:** {pedido}\n• **Tipo de Reclamo:** {tipo_reclamo}\n• **Fecha:** {fecha_hora}\n• **Dirección/Datos:** {direccion_datos}\n"""
+            if observaciones:
+                confirmation_message += f"• **Observaciones:** {observaciones}\n"
+            confirmation_message += "\nEl reclamo ha sido guardado en Google Sheets y será monitoreado automáticamente."
+            await interaction.response.send_message(confirmation_message, ephemeral=True)
+            state_manager.delete_user_state(user_id, "reclamos_ml")
+        except Exception as error:
+            print('Error general durante el procesamiento del modal de reclamos ML (on_submit):', error)
+            await interaction.response.send_message(f'❌ Hubo un error al procesar tu reclamo. Detalles: {error}', ephemeral=True)
+            state_manager.delete_user_state(str(interaction.user.id), "reclamos_ml")
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
+
 class Modals(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -992,6 +1117,12 @@ class Modals(commands.Cog):
     async def cancelacion(self, ctx):
         """Muestra el modal de Cancelación"""
         modal = CancelacionModal()
+        await ctx.send_modal(modal)
+
+    @commands.command()
+    async def reclamos_ml(self, ctx):
+        """Muestra el modal de Reclamo ML"""
+        modal = ReclamosMLModal()
         await ctx.send_modal(modal)
 
 async def setup(bot):
