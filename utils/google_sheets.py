@@ -106,14 +106,15 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
             if not h:
                 return ''
             return str(h).strip().replace('\u200b', '').replace('\ufeff', '').lower()
-        error_column_index = None
-        notified_column_index = None
-        for i, header in enumerate(header_row):
-            normalized_header = normaliza_encabezado(header)
-            if normalized_header == 'error':
-                error_column_index = i
-            elif normalized_header == 'errorenviocheck':
-                notified_column_index = i
+        # Buscar índices de columnas relevantes por nombre
+        idx_pedido = next((i for i, h in enumerate(header_row) if 'pedido' in normaliza_encabezado(h)), None)
+        idx_caso = next((i for i, h in enumerate(header_row) if 'caso' in normaliza_encabezado(h)), None)
+        idx_tipo = next((i for i, h in enumerate(header_row) if 'tipo' in normaliza_encabezado(h) or 'solicitud' in normaliza_encabezado(h)), None)
+        idx_datos = next((i for i, h in enumerate(header_row) if 'contacto' in normaliza_encabezado(h) or 'datos' in normaliza_encabezado(h)), None)
+        idx_error = next((i for i, h in enumerate(header_row) if 'error' == normaliza_encabezado(h)), None)
+        idx_agente = next((i for i, h in enumerate(header_row) if 'agente' in normaliza_encabezado(h)), None)
+        error_column_index = idx_error
+        notified_column_index = idx_agente
         if error_column_index is None or notified_column_index is None:
             return
         for i, row in enumerate(rows[1:], start=2):
@@ -125,12 +126,11 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
             error_value = str(row[error_idx]).strip() if len(row) > error_idx and row[error_idx] else ''
             notified_value = str(row[notified_idx]).strip() if len(row) > notified_idx and row[notified_idx] else ''
             if error_value and not notified_value:
-                pedido = row[0] if len(row) > 0 else 'N/A'
-                fecha = row[1] if len(row) > 1 else 'N/A'
-                agente_name = row[2] if len(row) > 2 else 'N/A'
-                numero_caso = row[3] if len(row) > 3 else 'N/A'
-                tipo_solicitud = row[4] if len(row) > 4 else 'N/A'
-                datos_contacto = row[5] if len(row) > 5 else 'N/A'
+                pedido = row[idx_pedido] if (idx_pedido is not None and isinstance(idx_pedido, int) and idx_pedido < len(row)) else 'N/A'
+                numero_caso = row[idx_caso] if (idx_caso is not None and isinstance(idx_caso, int) and idx_caso < len(row)) else 'N/A'
+                tipo_solicitud = row[idx_tipo] if (idx_tipo is not None and isinstance(idx_tipo, int) and idx_tipo < len(row)) else 'N/A'
+                datos_contacto = row[idx_datos] if (idx_datos is not None and isinstance(idx_datos, int) and idx_datos < len(row)) else 'N/A'
+                agente_name = row[idx_agente] if (idx_agente is not None and isinstance(idx_agente, int) and idx_agente < len(row)) else 'N/A'
                 mention = agente_name
                 found_member = next((m for m in members if m.display_name == agente_name or m.name == agente_name), None)
                 if found_member:
