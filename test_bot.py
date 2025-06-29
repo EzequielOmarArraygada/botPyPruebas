@@ -26,6 +26,7 @@ from unittest.mock import Mock, patch, MagicMock, PropertyMock, AsyncMock
 import asyncio
 from datetime import datetime
 import pytz
+from importlib import reload
 
 # Agregar el directorio raíz al path para importar módulos
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -44,18 +45,28 @@ class TestBotConfiguration(unittest.TestCase):
             'TARGET_CHANNEL_ID_FAC_A': '111111111',
             'TARGET_CHANNEL_ID_ENVIOS': '222222222',
             'TARGET_CHANNEL_ID_CASOS': '333333333',
-            'TARGET_CHANNEL_ID_BUSCAR_CASO': '444444444',
-            'TARGET_CHANNEL_ID_CASOS_REEMBOLSOS': '555555555',
-            'TARGET_CHANNEL_ID_TAREAS': '666666666',
-            'TARGET_CHANNEL_ID_TAREAS_REGISTRO': '777777777',
-            'TARGET_CHANNEL_ID_GUIA_COMANDOS': '888888888',
+            'TARGET_CHANNEL_ID_CASOS_ENVIOS': '444444444',
+            'TARGET_CHANNEL_ID_BUSCAR_CASO': '555555555',
+            'TARGET_CHANNEL_ID_CASOS_REEMBOLSOS': '666666666',
+            'TARGET_CHANNEL_ID_CASOS_CANCELACION': '777777777',
+            'TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML': '888888888',
+            'TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE': '999999999',
+            'TARGET_CHANNEL_ID_TAREAS': '101010101',
+            'TARGET_CHANNEL_ID_TAREAS_REGISTRO': '111111112',
+            'TARGET_CHANNEL_ID_GUIA_COMANDOS': '121212121',
             'SPREADSHEET_ID_FAC_A': 'test_sheet_id_fac_a',
             'SPREADSHEET_ID_CASOS': 'test_sheet_id_casos',
             'GOOGLE_SHEET_ID_TAREAS': 'test_sheet_id_tareas',
             'PARENT_DRIVE_FOLDER_ID': 'test_drive_folder_id',
             'MANUAL_DRIVE_FILE_ID': 'test_manual_file_id',
-            'TARGET_CATEGORY_ID': '999999999',
-            'ERROR_CHECK_INTERVAL_MS': '14400000'
+            'TARGET_CATEGORY_ID': '131313131',
+            'ERROR_CHECK_INTERVAL_MS': '14400000',
+            'GOOGLE_SHEET_RANGE_ENVIOS': 'ENVIOS!A:L',
+            'GOOGLE_SHEET_RANGE_CANCELACIONES': 'CANCELACIONES!A:L',
+            'GOOGLE_SHEET_RANGE_RECLAMOS_ML': 'RECLAMOS_ML!A:L',
+            'GOOGLE_SHEET_RANGE_PIEZA_FALTANTE': 'PIEZA_FALTANTE!A:J',
+            'GOOGLE_SHEET_RANGE_REEMBOLSOS': 'REEMBOLSOS!A:L',
+            'GOOGLE_SHEET_RANGE_CASOS_READ': 'SOLICITUDES_BGH!A:Z'
         }
     
     @patch.dict(os.environ, {}, clear=True)
@@ -864,6 +875,94 @@ class TestIntegrationFlows(unittest.TestCase):
                 await modal.on_submit(self.mock_interaction)
         asyncio.run(run())
 
+class TestErrorCheckingFeatures(unittest.TestCase):
+    """Tests para las funcionalidades de verificación de errores"""
+    
+    def setUp(self):
+        """Configuración inicial"""
+        self.mock_bot = Mock()
+        self.mock_sheet = Mock()
+        self.mock_channel = AsyncMock()
+        self.mock_guild = Mock()
+        
+    @patch('utils.google_sheets.check_sheet_for_errors')
+    @patch('utils.google_sheets.initialize_google_sheets')
+    def test_verificar_errores_command(self, mock_init, mock_check_errors):
+        """Test: Comando /verificar-errores"""
+        async def run():
+            from events.interaction_commands import InteractionCommands
+            
+            # Mock de la interacción
+            mock_interaction = AsyncMock()
+            mock_interaction.user.guild_permissions.administrator = True
+            mock_interaction.response.send_message = AsyncMock()
+            mock_interaction.followup.send = AsyncMock()
+            
+            # Mock de configuración
+            import config
+            config.GOOGLE_CREDENTIALS_JSON = '{"test": true}'
+            config.SPREADSHEET_ID_CASOS = 'test_sheet_id'
+            config.GUILD_ID = '123456789'
+            config.MAPA_RANGOS_ERRORES = {
+                'ENVIOS!A:L': '111111111',
+                'RECLAMOS_ML!A:L': '222222222'
+            }
+            
+            # Mock de Google Sheets
+            mock_client = Mock()
+            mock_spreadsheet = Mock()
+            mock_worksheet = Mock()
+            mock_client.open_by_key.return_value = mock_spreadsheet
+            mock_spreadsheet.worksheet.return_value = mock_worksheet
+            mock_init.return_value = mock_client
+            
+            # Crear instancia del comando
+            commands = InteractionCommands(self.mock_bot)
+            
+            # Ejecutar comando - usar el método directamente y pasar self
+            await commands.verificar_errores.callback(commands, mock_interaction)
+            
+            # Verificar que se llamó la función de verificación
+            self.assertTrue(mock_check_errors.called)
+            
+        asyncio.run(run())
+    
+    def test_mapa_rangos_errores_config(self):
+        """Test: Verificar configuración del mapeo de rangos de errores"""
+        with patch.dict(os.environ, {
+            'GOOGLE_SHEET_RANGE_ENVIOS': 'ENVIOS!A:L',
+            'GOOGLE_SHEET_RANGE_RECLAMOS_ML': 'RECLAMOS_ML!A:L',
+            'GOOGLE_SHEET_RANGE_PIEZA_FALTANTE': 'PIEZA_FALTANTE!A:J',
+            'GOOGLE_SHEET_RANGE_CANCELACIONES': 'CANCELACIONES!A:L',
+            'GOOGLE_SHEET_RANGE_REEMBOLSOS': 'REEMBOLSOS!A:L',
+            'GOOGLE_SHEET_RANGE_CASOS_READ': 'SOLICITUDES_BGH!A:Z',
+            'TARGET_CHANNEL_ID_CASOS_ENVIOS': '111111111',
+            'TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML': '222222222',
+            'TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE': '333333333',
+            'TARGET_CHANNEL_ID_CASOS_CANCELACION': '444444444',
+            'TARGET_CHANNEL_ID_REEMBOLSOS': '555555555',
+            'TARGET_CHANNEL_ID_CASOS': '666666666'
+        }):
+            import config
+            reload(config)
+            
+            # Verificar que el mapeo existe y tiene elementos
+            self.assertIsNotNone(config.MAPA_RANGOS_ERRORES)
+            self.assertGreater(len(config.MAPA_RANGOS_ERRORES), 0)
+            
+            # Verificar que contiene los rangos esperados
+            expected_ranges = [
+                'ENVIOS!A:L',
+                'RECLAMOS_ML!A:L', 
+                'PIEZA_FALTANTE!A:J',
+                'CANCELACIONES!A:L',
+                'REEMBOLSOS!A:L',
+                'SOLICITUDES_BGH!A:Z'
+            ]
+            
+            for expected_range in expected_ranges:
+                self.assertIn(expected_range, config.MAPA_RANGOS_ERRORES.keys())
+
 def run_tests():
     """Ejecutar todos los tests"""
     print("🧪 Iniciando Suite de Tests para CS-Bot")
@@ -887,7 +986,8 @@ def run_tests():
         TestIntegrationScenarios,
         TestAdditionalFeatures,
         TestCancelacionesFlow,
-        TestIntegrationFlows
+        TestIntegrationFlows,
+        TestErrorCheckingFeatures
     ]
     
     for test_class in test_classes:

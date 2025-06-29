@@ -93,7 +93,25 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
-            row_data = [pedido, fecha_hora, f'#{caso}', email, descripcion]
+            header = rows[0] if rows else []
+            # Normalizar nombres de columnas
+            def normaliza_columna(nombre):
+                if not nombre:
+                    return ''
+                return str(nombre).strip().replace('\u200b', '').replace('\ufeff', '').lower()
+            # Buscar índices de columnas por nombre
+            pedido_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'número de pedido'), 0)
+            fecha_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'fecha/hora'), 1)
+            caso_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'caso'), 2)
+            email_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'email'), 3)
+            desc_col = next((i for i, h in enumerate(header) if 'observaciones' in normaliza_columna(h)), 4)
+            # Crear fila con datos en las posiciones correctas
+            row_data = [''] * len(header)
+            row_data[pedido_col] = pedido
+            row_data[fecha_col] = fecha_hora
+            row_data[caso_col] = f'#{caso}'
+            row_data[email_col] = email
+            row_data[desc_col] = descripcion
             sheet.append_row(row_data)
             parent_folder_id = getattr(config, 'PARENT_DRIVE_FOLDER_ID', None)
             if parent_folder_id:
