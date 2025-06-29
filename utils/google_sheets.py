@@ -102,20 +102,23 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         except Exception:
             members = guild.members
         header_row = rows[0]
-        def normaliza_encabezado(h):
-            if not h:
-                return ''
-            return str(h).strip().replace('\u200b', '').replace('\ufeff', '').lower()
-        
-        # Buscar índices de columnas relevantes por nombre de forma más flexible
-        idx_pedido = next((i for i, h in enumerate(header_row) if 'pedido' in normaliza_encabezado(h)), None)
-        idx_caso = next((i for i, h in enumerate(header_row) if 'caso' in normaliza_encabezado(h)), None)
-        idx_tipo = next((i for i, h in enumerate(header_row) if 'tipo' in normaliza_encabezado(h) or 'solicitud' in normaliza_encabezado(h)), None)
-        idx_datos = next((i for i, h in enumerate(header_row) if 'contacto' in normaliza_encabezado(h) or 'datos' in normaliza_encabezado(h)), None)
-        idx_agente = next((i for i, h in enumerate(header_row) if 'agente' in normaliza_encabezado(h)), None)
-        idx_error = next((i for i, h in enumerate(header_row) if 'error' in normaliza_encabezado(h)), None)
-        idx_notificado = next((i for i, h in enumerate(header_row) if 'errorenviocheck' in normaliza_encabezado(h) or 'notificado' in normaliza_encabezado(h)), None)
-        
+        def normaliza_columna(nombre):
+            return str(nombre).strip().replace(' ', '').replace('\u200b', '').replace('\ufeff', '').lower()
+        def buscar_columna(header, posibles_nombres):
+            for nombre in posibles_nombres:
+                for i, h in enumerate(header):
+                    if normaliza_columna(h) == normaliza_columna(nombre):
+                        return i
+            return None
+        # Mapeo flexible de nombres de columna para cada campo
+        idx_pedido = buscar_columna(header_row, ["Número de pedido"])
+        idx_caso = buscar_columna(header_row, ["CASO ID WISE", "ID WISE"])
+        idx_tipo = buscar_columna(header_row, ["Solicitud", "Motivo de reembolso", "SOLICITUD", "Pieza faltante"])
+        idx_datos = buscar_columna(header_row, ["Dirección/Teléfono/Datos (Gestión Front)", "Dirección/Datos", "Correo del cliente"])
+        idx_agente = buscar_columna(header_row, ["Agente carga", "Agente (Front)", "Agente que carga", "Agente", "Agente (Back/TL)"])
+        idx_error = buscar_columna(header_row, ["ERROR"])
+        idx_notificado = buscar_columna(header_row, ["ErrorEnvioCheck", "ErrorEnvioCheck", "notificado"])
+        idx_observaciones = buscar_columna(header_row, ["Observaciones", "Observación adicional"])
         error_column_index = idx_error
         notified_column_index = idx_notificado
         if error_column_index is None or notified_column_index is None:
@@ -123,17 +126,17 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
         for i, row in enumerate(rows[1:], start=2):
             if error_column_index is None or notified_column_index is None:
                 continue
-            # Type assertions para resolver errores de linter
             error_idx = error_column_index  # type: int
             notified_idx = notified_column_index  # type: int
             error_value = str(row[error_idx]).strip() if len(row) > error_idx and row[error_idx] else ''
             notified_value = str(row[notified_idx]).strip() if len(row) > notified_idx and row[notified_idx] else ''
             if error_value and not notified_value:
-                pedido = row[idx_pedido] if (idx_pedido is not None and isinstance(idx_pedido, int) and idx_pedido < len(row)) else 'N/A'
-                numero_caso = row[idx_caso] if (idx_caso is not None and isinstance(idx_caso, int) and idx_caso < len(row)) else 'N/A'
-                tipo_solicitud = row[idx_tipo] if (idx_tipo is not None and isinstance(idx_tipo, int) and idx_tipo < len(row)) else 'N/A'
-                datos_contacto = row[idx_datos] if (idx_datos is not None and isinstance(idx_datos, int) and idx_datos < len(row)) else 'N/A'
-                agente_name = row[idx_agente] if (idx_agente is not None and isinstance(idx_agente, int) and idx_agente < len(row)) else 'N/A'
+                pedido = row[idx_pedido] if (idx_pedido is not None and idx_pedido < len(row)) else 'N/A'
+                numero_caso = row[idx_caso] if (idx_caso is not None and idx_caso < len(row)) else 'N/A'
+                tipo_solicitud = row[idx_tipo] if (idx_tipo is not None and idx_tipo < len(row)) else 'N/A'
+                datos_contacto = row[idx_datos] if (idx_datos is not None and idx_datos < len(row)) else 'N/A'
+                agente_name = row[idx_agente] if (idx_agente is not None and idx_agente < len(row)) else 'N/A'
+                observaciones = row[idx_observaciones] if (idx_observaciones is not None and idx_observaciones < len(row)) else 'N/A'
                 mention = agente_name
                 found_member = next((m for m in members if m.display_name == agente_name or m.name == agente_name), None)
                 if found_member:
@@ -150,6 +153,8 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                 embed.add_field(name="Tipo de Solicitud", value=tipo_solicitud, inline=False)
                 embed.add_field(name="Datos de Contacto", value=datos_contacto, inline=False)
                 embed.add_field(name="Error", value=error_value, inline=False)
+                if observaciones != 'N/A' and observaciones:
+                    embed.add_field(name="Observaciones", value=observaciones, inline=False)
                 embed.set_footer(text="Por favor, revisa la hoja para más detalles.")
                 try:
                     await cases_channel.send(content=f"{mention}", embed=embed)
