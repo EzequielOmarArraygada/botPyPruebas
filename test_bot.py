@@ -737,6 +737,20 @@ class TestIntegrationFlows(unittest.TestCase):
                 import config
                 config.GOOGLE_CREDENTIALS_JSON = '{}'
                 config.SPREADSHEET_ID_FAC_A = 'sheet_id'
+                
+                # Mock de la hoja con header actualizado
+                mock_sheet = Mock()
+                mock_sheet.get.return_value = [
+                    ['Número de Pedido', 'Fecha/Hora', 'Caso', 'Email', 'Observaciones'],
+                    ['PED001', '01/01/2024 10:00:00', '#CASO001', 'test@test.com', 'Test']
+                ]
+                mock_spreadsheet = Mock()
+                mock_spreadsheet.worksheet.return_value = mock_sheet
+                mock_spreadsheet.sheet1 = mock_sheet
+                mock_client = Mock()
+                mock_client.open_by_key.return_value = mock_spreadsheet
+                mock_init.return_value = mock_client
+                
                 modal.add_item = Mock()
                 await modal.on_submit(self.mock_interaction)
         asyncio.run(run())

@@ -135,34 +135,32 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                 found_member = next((m for m in members if m.display_name == agente_name or m.name == agente_name), None)
                 if found_member:
                     mention = f'<@{found_member.id}>'
-                notification_message = (
-                    f"\n🚨 **Error detectado en la hoja de Casos** 🚨\n\n"
-                    f"{mention}, hay un error marcado en un caso que cargaste:\n\n"
-                    f"**Fila en Sheet:** {i}\n"
-                    f"**N° de Pedido:** {pedido}\n"
-                    f"**N° de Caso:** {numero_caso}\n"
-                    f"**Tipo de Solicitud:** {tipo_solicitud}\n"
-                    f"**Datos de Contacto:** {datos_contacto}\n"
-                    f"**Error:** {error_value}\n\n"
-                    f"Por favor, revisa la hoja para más detalles."
+                # Crear embed profesional para el error
+                embed = discord.Embed(
+                    title="🚨 Error detectado en la hoja de Casos",
+                    description=f"Hay un error marcado en un caso que cargaste:",
+                    color=discord.Color.red()
                 )
+                embed.add_field(name="Fila en Sheet", value=str(i), inline=True)
+                embed.add_field(name="N° de Pedido", value=pedido, inline=True)
+                embed.add_field(name="N° de Caso", value=numero_caso, inline=True)
+                embed.add_field(name="Tipo de Solicitud", value=tipo_solicitud, inline=False)
+                embed.add_field(name="Datos de Contacto", value=datos_contacto, inline=False)
+                embed.add_field(name="Error", value=error_value, inline=False)
+                embed.set_footer(text="Por favor, revisa la hoja para más detalles.")
                 try:
-                    await cases_channel.send(notification_message)
+                    await cases_channel.send(content=f"{mention}", embed=embed)
                     tz = pytz.timezone('America/Argentina/Buenos_Aires')
                     now = datetime.now(tz)
                     notification_timestamp = now.strftime('%d-%m-%Y %H:%M:%S')
-                    
                     # Marcar la columna de notificación para evitar duplicados
                     try:
-                        # Calcular la celda de la columna de notificación
                         col_letter = chr(ord('A') + notified_idx)
                         cell_address = f"{col_letter}{i}"
-                        # Usar el formato correcto para actualizar una celda
                         sheet.update_acell(cell_address, notification_timestamp)
                         print(f"Columna de notificación marcada en {cell_address} con timestamp {notification_timestamp}")
                     except Exception as update_error:
                         print(f"Error al marcar columna de notificación: {update_error}")
-                        
                 except Exception as e:
                     print(f"Error al enviar notificación: {e}")
     except Exception as error:
