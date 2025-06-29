@@ -92,4 +92,14 @@ if ERROR_CHECK_INTERVAL_MS < 10000:
 # Prefijo para comandos (si usas comandos con prefijo)
 PREFIX = '!'
 
+# Mapeo de rangos de Google Sheets a canales de Discord para verificación de errores
+MAPA_RANGOS_ERRORES = {
+    GOOGLE_SHEET_RANGE_ENVIOS: TARGET_CHANNEL_ID_CASOS_ENVIOS,
+    GOOGLE_SHEET_RANGE_RECLAMOS_ML: TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML,
+    GOOGLE_SHEET_RANGE_PIEZA_FALTANTE: TARGET_CHANNEL_ID_CASOS_PIEZA_FALTANTE,
+    GOOGLE_SHEET_RANGE_CANCELACIONES: TARGET_CHANNEL_ID_CASOS_CANCELACION,
+    SHEET_RANGE_REEMBOLSOS: TARGET_CHANNEL_ID_REEMBOLSOS,
+    # Puedes agregar más rangos/canales aquí si sumas más flujos
+}
+
 # Agrega aquí otras configuraciones necesarias, como credenciales de Google, etc. 
