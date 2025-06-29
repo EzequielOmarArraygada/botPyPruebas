@@ -383,7 +383,6 @@ class PausarReanudarButton(discord.ui.Button):
             if match:
                 self.user_id = match.group(1)
                 self.tarea_id = match.group(2)
-        
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
@@ -401,12 +400,13 @@ class PausarReanudarButton(discord.ui.Button):
             fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
             if datos_tarea['estado'].lower() == 'en proceso':
                 google_sheets.pausar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
-                self.label = '▶️ Reanudar'
-                self.style = discord.ButtonStyle.success
-                self.custom_id = f'reanudar_{self.user_id}_{self.tarea_id}'
+                # Volver a obtener los datos actualizados
+                datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+                from tasks.panel import crear_embed_tarea, TareaControlView
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.orange()
-                await interaction.response.edit_message(embed=embed, view=self.view)
+                view = TareaControlView(self.user_id, self.tarea_id)
+                await interaction.response.edit_message(embed=embed, view=view)
                 msg = await interaction.followup.send('✅ Tarea pausada correctamente.')
                 await asyncio.sleep(20)
                 try:
@@ -415,12 +415,13 @@ class PausarReanudarButton(discord.ui.Button):
                     pass
             elif datos_tarea['estado'].lower() == 'pausada':
                 google_sheets.reanudar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
-                self.label = '⏸️ Pausar'
-                self.style = discord.ButtonStyle.secondary
-                self.custom_id = f'pausar_{self.user_id}_{self.tarea_id}'
+                # Volver a obtener los datos actualizados
+                datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+                from tasks.panel import crear_embed_tarea, TareaControlView
                 embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso', datos_tarea['tiempo_pausado'])
                 embed.color = discord.Color.green()
-                await interaction.response.edit_message(embed=embed, view=self.view)
+                view = TareaControlView(self.user_id, self.tarea_id)
+                await interaction.response.edit_message(embed=embed, view=view)
                 msg = await interaction.followup.send('✅ Tarea reanudada correctamente.')
                 await asyncio.sleep(20)
                 try:
