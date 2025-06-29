@@ -131,12 +131,25 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
             error_value = str(row[error_idx]).strip() if len(row) > error_idx and row[error_idx] else ''
             notified_value = str(row[notified_idx]).strip() if len(row) > notified_idx and row[notified_idx] else ''
             if error_value and not notified_value:
-                pedido = row[idx_pedido] if (idx_pedido is not None and idx_pedido < len(row)) else 'N/A'
-                numero_caso = row[idx_caso] if (idx_caso is not None and idx_caso < len(row)) else 'N/A'
-                tipo_solicitud = row[idx_tipo] if (idx_tipo is not None and idx_tipo < len(row)) else 'N/A'
-                datos_contacto = row[idx_datos] if (idx_datos is not None and idx_datos < len(row)) else 'N/A'
+                # Solo agregar campos si existen en la hoja
+                fields = []
+                if idx_pedido is not None and idx_pedido < len(row):
+                    pedido = row[idx_pedido]
+                    fields.append(("N° de Pedido", pedido, True))
+                if idx_caso is not None and idx_caso < len(row):
+                    numero_caso = row[idx_caso]
+                    fields.append(("N° de Caso", numero_caso, True))
+                if idx_tipo is not None and idx_tipo < len(row):
+                    tipo_solicitud = row[idx_tipo]
+                    fields.append(("Tipo de Solicitud", tipo_solicitud, False))
+                if idx_datos is not None and idx_datos < len(row):
+                    datos_contacto = row[idx_datos]
+                    fields.append(("Datos de Contacto", datos_contacto, False))
+                if idx_observaciones is not None and idx_observaciones < len(row):
+                    observaciones = row[idx_observaciones]
+                else:
+                    observaciones = None
                 agente_name = row[idx_agente] if (idx_agente is not None and idx_agente < len(row)) else 'N/A'
-                observaciones = row[idx_observaciones] if (idx_observaciones is not None and idx_observaciones < len(row)) else 'N/A'
                 mention = agente_name
                 found_member = next((m for m in members if m.display_name == agente_name or m.name == agente_name), None)
                 if found_member:
@@ -148,12 +161,10 @@ async def check_sheet_for_errors(bot, sheet, sheet_range: str, target_channel_id
                     color=discord.Color.red()
                 )
                 embed.add_field(name="Fila en Sheet", value=str(i), inline=True)
-                embed.add_field(name="N° de Pedido", value=pedido, inline=True)
-                embed.add_field(name="N° de Caso", value=numero_caso, inline=True)
-                embed.add_field(name="Tipo de Solicitud", value=tipo_solicitud, inline=False)
-                embed.add_field(name="Datos de Contacto", value=datos_contacto, inline=False)
+                for nombre, valor, inline in fields:
+                    embed.add_field(name=nombre, value=valor, inline=inline)
                 embed.add_field(name="Error", value=error_value, inline=False)
-                if observaciones != 'N/A' and observaciones:
+                if observaciones is not None and observaciones:
                     embed.add_field(name="Observaciones", value=observaciones, inline=False)
                 embed.set_footer(text="Por favor, revisa la hoja para más detalles.")
                 try:
