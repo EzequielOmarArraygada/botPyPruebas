@@ -478,13 +478,14 @@ class PanelComandosView(discord.ui.View):
         self.add_item(BuscarCasoButton())
         self.add_item(ReembolsosButton())
         self.add_item(CancelacionesButton())
+        self.add_item(ReclamosMLButton())
 
 def safe_int(val):
     """Convierte un valor a entero de forma segura, retornando 0 si no es posible"""
     if val is None:
         return 0
     try:
-        return int(val)
+        return int(str(val))
     except (ValueError, TypeError):
         return 0
 
@@ -870,6 +871,62 @@ class IniciarCancelacionesButton(discord.ui.Button):
             await interaction.response.send_message('Por favor, selecciona el tipo de cancelación:', view=view, ephemeral=True)
         except Exception as e:
             print(f'Error en IniciarCancelacionesButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class ReclamosMLButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Reclamos ML', emoji='🛒', style=discord.ButtonStyle.primary, custom_id='panel_reclamos_ml')
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            from config import TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML
+            canal_id = safe_int(TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML or '0')
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    await interaction.response.defer()
+                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg = await canal.send(f'🛒 {interaction.user.mention}, haz clic en el botón para iniciar un reclamo ML:', view=IniciarReclamosMLView(interaction.user.id))
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Reclamos ML.', ephemeral=True)
+            else:
+                await interaction.response.send_message('No se configuró el canal de Reclamos ML.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en ReclamosMLButton: {e}')
+            if not interaction.response.is_done():
+                await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class IniciarReclamosMLView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.add_item(IniciarReclamosMLButton(user_id))
+
+class IniciarReclamosMLButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar registro de Reclamo ML', style=discord.ButtonStyle.primary, custom_id=f'init_reclamos_ml_{user_id}')
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from utils.state_manager import set_user_state
+            set_user_state(str(interaction.user.id), {"type": "reclamos_ml", "paso": 1}, "reclamos_ml")
+            from interactions.select_menus import build_tipo_reclamos_ml_menu
+            view = build_tipo_reclamos_ml_menu()
+            await interaction.response.send_message('Por favor, selecciona el tipo de reclamo:', view=view, ephemeral=True)
+        except Exception as e:
+            print(f'Error en IniciarReclamosMLButton: {e}')
             await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
 
 class PanelComandos(commands.Cog):
