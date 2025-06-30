@@ -617,13 +617,22 @@ def obtener_tarea_por_id(sheet, tarea_id):
         
         for row in rows[1:]:
             if len(row) > tarea_id_col and row[tarea_id_col] == tarea_id:
+                user_id_col = get_col_index(header, 'Usuario ID')
+                usuario_col = get_col_index(header, 'Usuario')
+                tarea_col = get_col_index(header, 'Tarea')
+                observaciones_col = get_col_index(header, 'Observaciones')
+                estado_col = get_col_index(header, 'Estado (En proceso, Pausada)')
+                inicio_col = get_col_index(header, 'Fecha/hora de inicio')
+                tiempo_pausado_col = get_col_index(header, 'Tiempo pausada acumulado')
+                
                 return {
-                    'usuario': row[get_col_index(header, 'Usuario')] if get_col_index(header, 'Usuario') is not None and len(row) > get_col_index(header, 'Usuario') else '',
-                    'tarea': row[get_col_index(header, 'Tarea')] if get_col_index(header, 'Tarea') is not None and len(row) > get_col_index(header, 'Tarea') else '',
-                    'observaciones': row[get_col_index(header, 'Observaciones')] if get_col_index(header, 'Observaciones') is not None and len(row) > get_col_index(header, 'Observaciones') else '',
-                    'estado': row[get_col_index(header, 'Estado (En proceso, Pausada)')] if get_col_index(header, 'Estado (En proceso, Pausada)') is not None and len(row) > get_col_index(header, 'Estado (En proceso, Pausada)') else '',
-                    'inicio': row[get_col_index(header, 'Fecha/hora de inicio')] if get_col_index(header, 'Fecha/hora de inicio') is not None and len(row) > get_col_index(header, 'Fecha/hora de inicio') else '',
-                    'tiempo_pausado': row[get_col_index(header, 'Tiempo pausada acumulado')] if get_col_index(header, 'Tiempo pausada acumulado') is not None and len(row) > get_col_index(header, 'Tiempo pausada acumulado') else '00:00:00',
+                    'user_id': row[user_id_col] if user_id_col is not None and len(row) > user_id_col else '',
+                    'usuario': row[usuario_col] if usuario_col is not None and len(row) > usuario_col else '',
+                    'tarea': row[tarea_col] if tarea_col is not None and len(row) > tarea_col else '',
+                    'observaciones': row[observaciones_col] if observaciones_col is not None and len(row) > observaciones_col else '',
+                    'estado': row[estado_col] if estado_col is not None and len(row) > estado_col else '',
+                    'inicio': row[inicio_col] if inicio_col is not None and len(row) > inicio_col else '',
+                    'tiempo_pausado': row[tiempo_pausado_col] if tiempo_pausado_col is not None and len(row) > tiempo_pausado_col else '00:00:00',
                     'fila_idx': rows.index(row) + 1  # Índice de la fila para actualizaciones
                 }
         

@@ -383,6 +383,10 @@ class PausarReanudarButton(discord.ui.Button):
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
             return
+        
+        # Deferir la respuesta para evitar timeout
+        await interaction.response.defer()
+        
         try:
             client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
@@ -390,42 +394,77 @@ class PausarReanudarButton(discord.ui.Button):
             sheet_historial = spreadsheet.worksheet('Historial')
             datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
-                await interaction.response.send_message('❌ No se encontró la tarea especificada.', ephemeral=True)
+                await interaction.followup.send('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
+            
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
+            
             if datos_tarea['estado'].lower() == 'en proceso':
+                # Pausar la tarea
                 google_sheets.pausar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
+                
                 # Volver a obtener los datos actualizados
-                datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
-                from tasks.panel import crear_embed_tarea, TareaControlView
-                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'Pausada', datos_tarea['tiempo_pausado'])
+                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+                if not datos_tarea_actualizados:
+                    await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
+                    return
+                
+                # Crear nuevo embed y vista
+                embed = crear_embed_tarea(
+                    interaction.user, 
+                    datos_tarea_actualizados['tarea'], 
+                    datos_tarea_actualizados['observaciones'], 
+                    datos_tarea_actualizados['inicio'], 
+                    'Pausada', 
+                    datos_tarea_actualizados['tiempo_pausado']
+                )
                 embed.color = discord.Color.orange()
                 view = TareaControlView(self.user_id, self.tarea_id, 'pausada')
-                await interaction.response.edit_message(embed=embed, view=view)
-                msg = await interaction.followup.send('✅ Tarea pausada correctamente.')
-                await asyncio.sleep(20)
+                
+                # Actualizar el mensaje
                 try:
-                    await msg.delete()
-                except:
-                    pass
+                    await interaction.message.edit(embed=embed, view=view)
+                    await interaction.followup.send('✅ Tarea pausada correctamente.', ephemeral=True)
+                except Exception as edit_error:
+                    print(f'[ERROR] Error al actualizar mensaje: {edit_error}')
+                    await interaction.followup.send('✅ Tarea pausada correctamente, pero hubo un problema al actualizar la interfaz.', ephemeral=True)
+                
             elif datos_tarea['estado'].lower() == 'pausada':
+                # Reanudar la tarea
                 google_sheets.reanudar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
+                
                 # Volver a obtener los datos actualizados
-                datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
-                from tasks.panel import crear_embed_tarea, TareaControlView
-                embed = crear_embed_tarea(interaction.user, datos_tarea['tarea'], datos_tarea['observaciones'], datos_tarea['inicio'], 'En proceso', datos_tarea['tiempo_pausado'])
+                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+                if not datos_tarea_actualizados:
+                    await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
+                    return
+                
+                # Crear nuevo embed y vista
+                embed = crear_embed_tarea(
+                    interaction.user, 
+                    datos_tarea_actualizados['tarea'], 
+                    datos_tarea_actualizados['observaciones'], 
+                    datos_tarea_actualizados['inicio'], 
+                    'En proceso', 
+                    datos_tarea_actualizados['tiempo_pausado']
+                )
                 embed.color = discord.Color.green()
                 view = TareaControlView(self.user_id, self.tarea_id, 'en proceso')
-                await interaction.response.edit_message(embed=embed, view=view)
-                msg = await interaction.followup.send('✅ Tarea reanudada correctamente.')
-                await asyncio.sleep(20)
+                
+                # Actualizar el mensaje
                 try:
-                    await msg.delete()
-                except:
-                    pass
+                    await interaction.message.edit(embed=embed, view=view)
+                    await interaction.followup.send('✅ Tarea reanudada correctamente.', ephemeral=True)
+                except Exception as edit_error:
+                    print(f'[ERROR] Error al actualizar mensaje: {edit_error}')
+                    await interaction.followup.send('✅ Tarea reanudada correctamente, pero hubo un problema al actualizar la interfaz.', ephemeral=True)
+            else:
+                await interaction.followup.send(f'❌ Estado de tarea no válido: {datos_tarea["estado"]}', ephemeral=True)
+                
         except Exception as e:
+            print(f'[ERROR] Error en PausarReanudarButton callback: {e}')
             await interaction.followup.send(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
 
 class FinalizarButton(discord.ui.Button):
