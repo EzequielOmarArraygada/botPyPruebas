@@ -124,6 +124,7 @@ async def load_extensions():
         'events.interaction_commands', 
         'events.interaction_selects',
         'events.attachment_handler',
+        'events.admin_commands', 
         'interactions.modals',
         'interactions.select_menus',
         'tasks.panel'

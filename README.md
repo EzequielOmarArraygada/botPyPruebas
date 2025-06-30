@@ -140,6 +140,59 @@ def test_factura_a_flow():
 | `/setup_panel_tareas` | Publica panel de tareas | Administrador |
 | `/setup_panel_comandos` | Publica panel de comandos | Administrador |
 | `/testping` | Verifica estado del bot | DM |
+| `/reset_bot` | Reinicia conexiones del bot | Administrador |
+| `/bot_status` | Muestra estado detallado del bot | Administrador |
+
+### Comandos de Administración Avanzados
+
+#### 🔄 `/reset_bot`
+**Descripción:** Reinicia las conexiones del bot sin necesidad de reiniciar todo el servidor.
+
+**Permisos:** Solo administradores del servidor
+
+**Parámetros:**
+- `force` (opcional): Forzar reset incluso si se usó recientemente (boolean)
+
+**Funcionalidad:**
+1. **Limpia el cache** de estados de usuarios
+2. **Reinicializa Google Sheets** - reconecta con la API
+3. **Reinicializa Google Drive** - reconecta con la API
+4. **Recarga el manual** desde Google Drive
+5. **Reinicializa Gemini AI** - limpia el cache de IA
+6. **Recarga extensiones críticas** del bot
+
+**Cooldown:** 5 minutos entre resets (se puede saltar con `force=True`)
+
+**Casos de uso:**
+- El bot no responde a comandos
+- Las conexiones con Google Sheets/Drive fallan
+- Los botones de tareas no funcionan correctamente
+- El manual no se actualiza
+- La IA (Gemini) no responde
+
+#### 📊 `/bot_status`
+**Descripción:** Muestra información detallada del estado actual del bot.
+
+**Permisos:** Solo administradores del servidor
+
+**Información mostrada:**
+- ID del bot y tiempo de creación
+- Estado de conexiones (Google Sheets, Drive, Gemini)
+- Extensiones cargadas
+- Último reset realizado
+- Latencia de conexión
+
+**Casos de uso:**
+- Verificar que todas las conexiones estén activas
+- Diagnosticar problemas de conectividad
+- Monitorear el estado del bot
+- Antes de realizar un reset
+
+**Seguridad:**
+- Verificación de permisos de administrador
+- Comandos ephemeral (solo visibles para el admin)
+- Logs detallados de cada acción
+- Cooldown de 5 minutos entre resets
 
 ## 🛠️ Instalación
 
@@ -319,6 +372,23 @@ python redeploy.py
 - Usa `/testping` para verificar conectividad
 - Revisa la configuración con `check_config.py`
 - Ejecuta los tests para diagnosticar problemas
+
+### Comandos de Administración para Troubleshooting
+- **`/bot_status`**: Verifica el estado de todas las conexiones del bot
+- **`/reset_bot`**: Reinicia conexiones cuando el bot no responde correctamente
+- **`/reset_bot force:true`**: Fuerza un reset inmediato en emergencias
+
+**Logs de administración:**
+```
+[ADMIN] Reset iniciado por Usuario#1234 (123456789) a las 01/01/2024 12:00:00
+[ADMIN] Cache de estados limpiado
+[ADMIN] Google Sheets reinicializado
+[ADMIN] Google Drive reinicializado
+[ADMIN] Manual recargado
+[ADMIN] Gemini reinicializado
+[ADMIN] Extension recargada: events.interaction_commands
+[ADMIN] Reset completado exitosamente por Usuario#1234
+```
 
 ## 📚 Dependencias
 
