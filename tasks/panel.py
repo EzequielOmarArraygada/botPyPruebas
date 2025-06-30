@@ -499,11 +499,226 @@ class FinalizarButton(discord.ui.Button):
 # --- REGISTRO DE VIEWS PERSISTENTES EN EL ARRANQUE DEL BOT ---
 async def setup(bot):
     print('[DEBUG] Ejecutando setup() de TaskPanel')
+    
     # Registrar las views persistentes para los botones de tareas
-    # Nota: TareaControlView se registra automáticamente cuando se crea con custom_id
+    # Crear views persistentes para los botones de tarea
+    persistent_views = [
+        TareaControlViewPersistent(),
+        TaskPanelView(),
+        PanelComandosView()
+    ]
+    
+    # Agregar las views persistentes al bot
+    for view in persistent_views:
+        bot.add_view(view)
+        print(f'[DEBUG] View persistente registrada: {view.__class__.__name__}')
+    
     await bot.add_cog(TaskPanel(bot))
     await bot.add_cog(PanelComandos(bot))
     print('[DEBUG] TaskPanel y PanelComandos Cogs agregados al bot')
+
+class TareaControlViewPersistent(discord.ui.View):
+    """
+    View persistente para manejar botones de tarea que ya existen en Discord
+    cuando el bot se reinicia.
+    """
+    def __init__(self):
+        super().__init__(timeout=None)
+        # Agregar botones persistentes que pueden manejar cualquier tarea
+        self.add_item(PausarReanudarButtonPersistent())
+        self.add_item(FinalizarButtonPersistent())
+
+class PausarReanudarButtonPersistent(discord.ui.Button):
+    """
+    Botón persistente que puede manejar cualquier tarea pausando/reanudando
+    basándose en el custom_id del mensaje.
+    """
+    def __init__(self):
+        super().__init__(label="⏸️ Pausar/Reanudar", style=discord.ButtonStyle.secondary, custom_id="tarea_pausar_reanudar_persistent")
+
+    async def callback(self, interaction: discord.Interaction):
+        # Deferir la respuesta para evitar timeout
+        await interaction.response.defer()
+        
+        try:
+            # Obtener el custom_id del mensaje para extraer user_id y tarea_id
+            # Los mensajes de tarea tienen custom_id en el formato: tarea_{user_id}_{tarea_id}
+            message_custom_id = interaction.message.content or ""
+            
+            # Buscar el custom_id en el embed o en el mensaje
+            user_id = None
+            tarea_id = None
+            
+            # Intentar extraer de diferentes fuentes
+            if hasattr(interaction.message, 'embeds') and interaction.message.embeds:
+                embed = interaction.message.embeds[0]
+                # Buscar en los campos del embed
+                for field in embed.fields:
+                    if field.name == "👤 Asesor":
+                        # Extraer user_id del mention
+                        mention_match = re.search(r'<@!?(\d+)>', field.value)
+                        if mention_match:
+                            user_id = mention_match.group(1)
+                        break
+            
+            # Si no encontramos user_id, verificar si el usuario actual tiene una tarea activa
+            if not user_id:
+                user_id = str(interaction.user.id)
+                
+                # Buscar tarea activa del usuario
+                import utils.google_sheets as google_sheets
+                import config
+                
+                client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+                spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+                sheet_activas = spreadsheet.worksheet('Tareas Activas')
+                
+                datos_tarea = google_sheets.obtener_tarea_activa_por_usuario(sheet_activas, user_id)
+                if datos_tarea:
+                    tarea_id = datos_tarea['tarea_id']
+                else:
+                    await interaction.followup.send('❌ No se encontró una tarea activa para este usuario.', ephemeral=True)
+                    return
+            else:
+                # Extraer tarea_id del custom_id del mensaje si está disponible
+                # Esto requeriría que guardemos el tarea_id en algún lugar del mensaje
+                # Por ahora, buscaremos la tarea activa del usuario
+                import utils.google_sheets as google_sheets
+                import config
+                
+                client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+                spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+                sheet_activas = spreadsheet.worksheet('Tareas Activas')
+                
+                datos_tarea = google_sheets.obtener_tarea_activa_por_usuario(sheet_activas, user_id)
+                if datos_tarea:
+                    tarea_id = datos_tarea['tarea_id']
+                else:
+                    await interaction.followup.send('❌ No se encontró una tarea activa para este usuario.', ephemeral=True)
+                    return
+            
+            # Verificar que el usuario sea el propietario de la tarea
+            if str(interaction.user.id) != user_id:
+                await interaction.followup.send('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
+                return
+            
+            # Ahora proceder con la lógica de pausar/reanudar
+            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            sheet_activas = spreadsheet.worksheet('Tareas Activas')
+            sheet_historial = spreadsheet.worksheet('Historial')
+            
+            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, tarea_id)
+            if not datos_tarea:
+                await interaction.followup.send('❌ No se encontró la tarea especificada.', ephemeral=True)
+                return
+            
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_actual = now.strftime('%d/%m/%Y %H:%M:%S')
+            
+            if datos_tarea['estado'].lower() == 'en proceso':
+                # Pausar la tarea
+                google_sheets.pausar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, str(interaction.user), fecha_actual)
+                
+                # Volver a obtener los datos actualizados
+                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, tarea_id)
+                if not datos_tarea_actualizados:
+                    await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
+                    return
+                
+                # Crear nuevo embed y vista
+                embed = crear_embed_tarea(
+                    interaction.user, 
+                    datos_tarea_actualizados['tarea'], 
+                    datos_tarea_actualizados['observaciones'], 
+                    datos_tarea_actualizados['inicio'], 
+                    'Pausada', 
+                    datos_tarea_actualizados['tiempo_pausado']
+                )
+                embed.color = discord.Color.orange()
+                
+                # Actualizar el mensaje
+                try:
+                    await interaction.message.edit(embed=embed)
+                    await interaction.followup.send('✅ Tarea pausada correctamente.', ephemeral=True)
+                except Exception as edit_error:
+                    print(f'[ERROR] Error al actualizar mensaje: {edit_error}')
+                    await interaction.followup.send('✅ Tarea pausada correctamente, pero hubo un problema al actualizar la interfaz.', ephemeral=True)
+                
+            elif datos_tarea['estado'].lower() == 'pausada':
+                # Reanudar la tarea
+                google_sheets.reanudar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, str(interaction.user), fecha_actual)
+                
+                # Volver a obtener los datos actualizados
+                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, tarea_id)
+                if not datos_tarea_actualizados:
+                    await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
+                    return
+                
+                # Crear nuevo embed y vista
+                embed = crear_embed_tarea(
+                    interaction.user, 
+                    datos_tarea_actualizados['tarea'], 
+                    datos_tarea_actualizados['observaciones'], 
+                    datos_tarea_actualizados['inicio'], 
+                    'En proceso', 
+                    datos_tarea_actualizados['tiempo_pausado']
+                )
+                embed.color = discord.Color.green()
+                
+                # Actualizar el mensaje
+                try:
+                    await interaction.message.edit(embed=embed)
+                    await interaction.followup.send('✅ Tarea reanudada correctamente.', ephemeral=True)
+                except Exception as edit_error:
+                    print(f'[ERROR] Error al actualizar mensaje: {edit_error}')
+                    await interaction.followup.send('✅ Tarea reanudada correctamente, pero hubo un problema al actualizar la interfaz.', ephemeral=True)
+            else:
+                await interaction.followup.send(f'❌ Estado de tarea no válido: {datos_tarea["estado"]}', ephemeral=True)
+                
+        except Exception as e:
+            print(f'[ERROR] Error en PausarReanudarButtonPersistent callback: {e}')
+            await interaction.followup.send(f'❌ Error al modificar la tarea: {str(e)}', ephemeral=True)
+
+class FinalizarButtonPersistent(discord.ui.Button):
+    """
+    Botón persistente para finalizar tareas.
+    """
+    def __init__(self):
+        super().__init__(label='✅ Finalizar', style=discord.ButtonStyle.danger, custom_id='finalizar_persistent')
+
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            # Buscar tarea activa del usuario
+            user_id = str(interaction.user.id)
+            
+            import utils.google_sheets as google_sheets
+            import config
+            
+            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            sheet_activas = spreadsheet.worksheet('Tareas Activas')
+            
+            datos_tarea = google_sheets.obtener_tarea_activa_por_usuario(sheet_activas, user_id)
+            if not datos_tarea:
+                await interaction.response.send_message('❌ No se encontró una tarea activa para finalizar.', ephemeral=True)
+                return
+            
+            tarea_id = datos_tarea['tarea_id']
+            
+            # Verificar que el usuario sea el propietario de la tarea
+            if str(interaction.user.id) != datos_tarea.get('user_id', ''):
+                await interaction.response.send_message('❌ Solo puedes modificar tus propias tareas.', ephemeral=True)
+                return
+            
+            from interactions.modals import CantidadCasosModal
+            modal = CantidadCasosModal(tarea_id, user_id)
+            await interaction.response.send_modal(modal)
+            
+        except Exception as e:
+            print(f'[ERROR] Error en FinalizarButtonPersistent callback: {e}')
+            await interaction.followup.send(f'❌ Error al finalizar la tarea: {str(e)}', ephemeral=True)
 
 class PanelComandosView(discord.ui.View):
     def __init__(self):

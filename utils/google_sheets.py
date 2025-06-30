@@ -662,6 +662,7 @@ def obtener_tarea_activa_por_usuario(sheet, user_id):
                 estado = row[estado_col_idx] if estado_col_idx is not None and len(row) > estado_col_idx else ''
                 if estado.lower() in ['en proceso', 'pausada']:
                     return {
+                        'user_id': user_id,
                         'tarea_id': row[get_col_index(header, 'Tarea ID')] if get_col_index(header, 'Tarea ID') is not None and len(row) > get_col_index(header, 'Tarea ID') else '',
                         'usuario': row[get_col_index(header, 'Usuario')] if get_col_index(header, 'Usuario') is not None and len(row) > get_col_index(header, 'Usuario') else '',
                         'tarea': row[get_col_index(header, 'Tarea')] if get_col_index(header, 'Tarea') is not None and len(row) > get_col_index(header, 'Tarea') else '',
