@@ -6,13 +6,16 @@ logs
 # Directorios temporales
 tmp
 temp
+tests
+credenciales-botCS.json
 
 myenv/
 
-credenciales/
+
 .env
 notas.txt
 
 
 __pycache__/
+__pycache__
 __init__.py

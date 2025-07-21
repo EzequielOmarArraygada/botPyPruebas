@@ -2,9 +2,10 @@ import discord
 from discord.ext import commands, tasks
 import asyncio
 import config
-from utils.google_sheets import initialize_google_sheets, check_sheet_for_errors
-from utils.google_drive import initialize_google_drive
+import logging
+from utils.google_client_manager import initialize_google_clients, get_sheets_client, get_drive_client
 from utils.andreani import get_andreani_tracking
+from utils.discord_logger import setup_discord_logging, log_exception
 # from utils.qa_service import get_answer_from_manual
 # from utils.manual_processor import load_and_cache_manual, get_manual_text
 
@@ -20,18 +21,37 @@ drive_instance = None
 async def on_ready():
     print(f'Bot conectado como {bot.user}!')
     
+    # Configurar sistema de logging para Discord
+    try:
+        global console_redirector
+        console_redirector = setup_discord_logging(bot)
+        print("Sistema de logging para Discord configurado correctamente.")
+    except Exception as error:
+        print(f"Error al configurar sistema de logging: {error}")
+    
     # Inicializar APIs de Google
     global sheets_instance, drive_instance
     try:
-        if not config.GOOGLE_CREDENTIALS_JSON:
-            print("Error CRÍTICO: La variable de entorno GOOGLE_CREDENTIALS_JSON no está configurada.")
-            return
-        sheets_instance = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
-        drive_instance = initialize_google_drive(config.GOOGLE_CREDENTIALS_JSON)
-        print("APIs de Google inicializadas correctamente.")
+        # Usar el gestor centralizado de clientes de Google
+        initialize_google_clients()
+        sheets_instance = get_sheets_client()
+        drive_instance = get_drive_client()
+        
+        # Agregar las instancias como atributos del bot para acceso global
+        bot.sheets_instance = sheets_instance
+        bot.drive_instance = drive_instance
+        
+        if sheets_instance and drive_instance:
+            print("✅ APIs de Google inicializadas correctamente.")
+        else:
+            print("⚠️ APIs de Google no disponibles, pero el bot continuará funcionando.")
     except Exception as error:
-        print("Error al inicializar APIs de Google:", error)
-        return
+        print(f"⚠️ Error al inicializar APIs de Google: {error}")
+        print("El bot continuará funcionando sin las APIs de Google.")
+        sheets_instance = None
+        drive_instance = None
+        bot.sheets_instance = None
+        bot.drive_instance = None
 
     # Cargar el manual en memoria
     if config.MANUAL_DRIVE_FILE_ID and drive_instance:
@@ -49,7 +69,7 @@ async def on_ready():
     # Iniciar la verificación periódica de errores en la hoja
     if (config.SPREADSHEET_ID_BUSCAR_CASO and config.SHEET_RANGE_CASOS_READ and 
         config.TARGET_CHANNEL_ID_CASOS and config.GUILD_ID):
-        print(f"Iniciando verificación periódica de errores cada {config.ERROR_CHECK_INTERVAL_MS / 1000} segundos en la hoja de búsqueda.")
+        print(f"Iniciando verificación periódica de errores cada {config.ERROR_CHECK_INTERVAL_MIN} minutos en la hoja de búsqueda.")
         check_errors.start()
     else:
         print("La verificación periódica de errores en la hoja de búsqueda no se iniciará debido a la falta de configuración.")
@@ -68,10 +88,12 @@ async def on_ready():
     except Exception as e:
         print(f"Error al sincronizar comandos: {e}")
 
-@tasks.loop(seconds=config.ERROR_CHECK_INTERVAL_MS / 1000)
+@tasks.loop(minutes=config.ERROR_CHECK_INTERVAL_MIN)
 async def check_errors():
     """Tarea periódica para verificar errores en múltiples rangos de Google Sheets"""
-    if sheets_instance:
+    if not sheets_instance:
+        print("⚠️ Verificación de errores omitida: instancia de Sheets no disponible")
+        return
         try:
             if not config.SPREADSHEET_ID_CASOS:
                 print("Error: SPREADSHEET_ID_CASOS no está configurado")
@@ -99,6 +121,7 @@ async def check_errors():
                     print(f"Error al abrir la hoja {hoja_nombre or '[default]'}: {sheet_error}")
                     continue
                 try:
+                    from utils.google_sheets import check_sheet_for_errors
                     await check_sheet_for_errors(
                         bot,
                         sheet,
@@ -116,6 +139,26 @@ async def before_check_errors():
     """Esperar hasta que el bot esté listo antes de iniciar la tarea"""
     await bot.wait_until_ready()
 
+@bot.event
+async def on_error(event, *args, **kwargs):
+    """Manejador global de errores"""
+    import traceback
+    error_info = traceback.format_exc()
+    print(f"Error en evento {event}: {error_info}")
+    try:
+        log_exception(bot, Exception(f"Error en evento {event}: {error_info}"), f"Evento: {event}")
+    except:
+        pass
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Manejador de errores de comandos"""
+    print(f"Error en comando {ctx.command}: {error}")
+    try:
+        log_exception(bot, error, f"Comando: {ctx.command}")
+    except:
+        pass
+
 # Cargar eventos y comandos
 async def load_extensions():
     """Cargar todas las extensiones (eventos y comandos)"""
@@ -124,7 +167,8 @@ async def load_extensions():
         'events.interaction_commands', 
         'events.interaction_selects',
         'events.attachment_handler',
-        'events.admin_commands', 
+        'events.admin_commands',
+        'events.logging_commands',
         'interactions.modals',
         'interactions.select_menus',
         'tasks.panel'
@@ -136,24 +180,27 @@ async def load_extensions():
             print(f"Extension cargada: {extension}")
         except Exception as e:
             print(f"Error al cargar extension {extension}: {e}")
+            # Log detallado del error
+            import traceback
+            print(f"Traceback completo: {traceback.format_exc()}")
 
 async def register_persistent_views():
     """Registrar views persistentes para botones que funcionen después de redeploy"""
-    try:
-        from tasks.panel import TaskPanelView, TareaControlView, PanelComandosView
-        from events.attachment_handler import SolicitudCargadaView
-        
-        # Registrar views del panel de tareas (solo las que no tienen timeout)
-        bot.add_view(TaskPanelView())
-        bot.add_view(TareaControlView())
-        bot.add_view(PanelComandosView())
-        
-        # Registrar view para solicitudes de Factura A
-        bot.add_view(SolicitudCargadaView("placeholder", "placeholder", "placeholder", "placeholder", "placeholder"))
-        
-        print("Views persistentes registradas correctamente")
-    except Exception as e:
-        print(f"Error al registrar views persistentes: {e}")
+    # try:
+    from tasks.panel import TaskPanelView, TareaControlView, PanelComandosView
+    from events.attachment_handler import SolicitudCargadaView
+    
+    # Registrar views del panel de tareas (solo las que no tienen timeout)
+    bot.add_view(TaskPanelView())
+    bot.add_view(TareaControlView())
+    bot.add_view(PanelComandosView())
+    
+    # Registrar view para solicitudes de Factura A
+    bot.add_view(SolicitudCargadaView("placeholder", "placeholder", "placeholder", "placeholder", "placeholder"))
+    
+    print("Views persistentes registradas correctamente")
+    # except Exception as e:
+    #     print(f"Error al registrar views persistentes: {e}")
 
 async def main():
     print("Paso 1: Iniciando bot...")
@@ -173,9 +220,18 @@ async def main():
     try:
         print("Paso 3: Conectando con Discord...")
         await bot.start(config.TOKEN)
-    except Exception as e:
-        print(f"Paso 3: Error al conectar con Discord: {e}")
-        return
+    finally:
+        print("Paso 4: Apagando bot de forma inmediata...")
+        # Limpiar sistema de logging si existe
+        try:
+            if 'console_redirector' in globals():
+                console_redirector.stop()
+                print("Sistema de logging detenido.")
+        except:
+            pass
+    # except Exception as e:
+    #     print(f"Paso 3: Error al conectar con Discord: {e}")
+    #     return
 
 if __name__ == "__main__":
     asyncio.run(main())

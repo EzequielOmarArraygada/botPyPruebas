@@ -64,10 +64,11 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             if not config.SPREADSHEET_ID_FAC_A:
                 await interaction.response.send_message('❌ Error: El ID de la hoja de Factura A no está configurado.', ephemeral=True)
                 return
-            from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from utils.google_sheets import check_if_pedido_exists
+            from utils.google_client_manager import get_sheets_client
             from datetime import datetime
             import pytz
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_FAC_A)
             sheet_range = getattr(config, 'SHEET_RANGE_FAC_A', 'A:E')
             hoja_nombre = None
@@ -124,6 +125,174 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             await interaction.response.send_message(confirmation_message, ephemeral=True)
         except Exception as error:
             await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud de Factura A. Detalles: {error}', ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
+
+class FacturaBModal(discord.ui.Modal, title='Registrar Solicitud Factura B'):
+    def __init__(self):
+        super().__init__(custom_id='facturaBModal')
+        self.pedido = discord.ui.TextInput(
+            label="Número de pedido",
+            placeholder="Ingresa el número de pedido...",
+            custom_id="pedidoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.caso = discord.ui.TextInput(
+            label="ID Caso Wise",
+            placeholder="Ingresa el ID del caso Wise...",
+            custom_id="casoInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        self.email = discord.ui.TextInput(
+            label="Email",
+            placeholder="ejemplo@email.com",
+            custom_id="emailInput",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=100
+        )
+        
+        # Agregar los componentes al modal
+        self.add_item(self.pedido)
+        self.add_item(self.caso)
+        self.add_item(self.email)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        import config
+        import utils.state_manager as state_manager
+        from utils.state_manager import generar_solicitud_id, cleanup_expired_states, get_user_state
+        cleanup_expired_states()
+        try:
+            user_id = str(interaction.user.id)
+            solicitud_id = generar_solicitud_id(user_id)
+            pedido = self.pedido.value.strip()
+            caso = self.caso.value.strip()
+            email = self.email.value.strip()
+            
+            if not pedido or not caso or not email:
+                await interaction.response.send_message('❌ Error: Los campos Pedido, ID Caso Wise y Email son requeridos.', ephemeral=True)
+                return
+                
+            # Obtener el canal de compra del estado del usuario
+            user_state = get_user_state(user_id, "facturaB")
+            if not user_state or not user_state.get('canalCompra'):
+                await interaction.response.send_message('❌ Error: No se encontró el canal de compra seleccionado.', ephemeral=True)
+                return
+            canal_compra = user_state['canalCompra']
+            
+            if not config.GOOGLE_CREDENTIALS_JSON:
+                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                return
+            if not config.SPREADSHEET_ID_FAC_A:
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Factura B no está configurado.', ephemeral=True)
+                return
+                
+            from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from utils.google_client_manager import get_sheets_client
+            from datetime import datetime
+            import pytz
+            client = get_sheets_client()
+            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_FAC_A)
+            sheet_range = getattr(config, 'SHEET_RANGE_FAC_B', 'FacB!A:G')
+            hoja_nombre = None
+            if '!' in sheet_range:
+                partes = sheet_range.split('!')
+                if len(partes) == 2:
+                    hoja_nombre = partes[0].strip("'")
+                    sheet_range_puro = partes[1]
+                else:
+                    hoja_nombre = None
+                    sheet_range_puro = sheet_range
+            else:
+                sheet_range_puro = sheet_range
+            if hoja_nombre:
+                sheet = spreadsheet.worksheet(hoja_nombre)
+            else:
+                sheet = spreadsheet.sheet1
+            rows = sheet.get(sheet_range_puro)
+            is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
+            if is_duplicate:
+                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Factura B.', ephemeral=True)
+                return
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
+            header = rows[0] if rows else []
+            # Normalizar nombres de columnas
+            def normaliza_columna(nombre):
+                if not nombre:
+                    return ''
+                return str(nombre).strip().replace('\u200b', '').replace('\ufeff', '').lower()
+            # Buscar índices de columnas por nombre
+            fecha_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'fecha de carga'), 0)
+            asesor_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'asesor que carga'), 1)
+            pedido_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'número de pedido'), 2)
+            caso_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'id caso wise'), 3)
+            canal_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'canal de compra'), 4)
+            email_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'correo electronico'), 5)
+            # Crear fila con datos en las posiciones correctas
+            row_data = [''] * len(header)
+            row_data[fecha_col] = fecha_hora
+            row_data[asesor_col] = interaction.user.display_name
+            row_data[pedido_col] = pedido
+            row_data[caso_col] = caso
+            row_data[canal_col] = canal_compra
+            row_data[email_col] = email
+            sheet.append_row(row_data)
+            
+            # Crear embed con los datos de la solicitud
+            embed = discord.Embed(
+                title='🧾 Nueva Solicitud de Factura B',
+                description='Se ha cargado una nueva solicitud de Factura B en Google Sheets.',
+                color=discord.Color.green(),
+                timestamp=now
+            )
+            
+            embed.add_field(
+                name='📋 Número de Pedido',
+                value=pedido,
+                inline=True
+            )
+            
+            embed.add_field(
+                name='📝 ID Caso Wise',
+                value=caso,
+                inline=True
+            )
+            
+            embed.add_field(
+                name='📧 Email',
+                value=email,
+                inline=True
+            )
+            
+            embed.add_field(
+                name='🛒 Canal de Compra',
+                value=canal_compra,
+                inline=True
+            )
+            
+            embed.add_field(
+                name='👤 Asesor',
+                value=interaction.user.display_name,
+                inline=True
+            )
+            
+            embed.add_field(
+                name='📅 Fecha de Carga',
+                value=fecha_hora,
+                inline=True
+            )
+            
+            embed.set_footer(text=f'Solicitud cargada por {interaction.user.display_name}')
+            
+            await interaction.response.send_message(embed=embed)
+        except Exception as error:
+            await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud de Factura B. Detalles: {error}', ephemeral=True)
         if not interaction.response.is_done():
             await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
 
@@ -185,6 +354,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
                 return
             # Verificar duplicado y guardar en Google Sheets
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from utils.google_client_manager import get_sheets_client
             from datetime import datetime
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
@@ -195,7 +365,7 @@ class CasoModal(discord.ui.Modal, title='Detalles del Caso'):
                 await interaction.response.send_message('❌ Error: El ID de la hoja de Casos no está configurado.', ephemeral=True)
                 state_manager.delete_user_state(user_id, "cambios_devoluciones")
                 return
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             sheet_range = getattr(config, 'SHEET_RANGE_CASOS_READ', 'A:K')
             hoja_nombre = None
@@ -393,7 +563,7 @@ class BuscarCasoModal(discord.ui.Modal, title='Búsqueda de Caso'):
             
             # Inicializar cliente de Google Sheets
             from utils.google_sheets import initialize_google_sheets
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_BUSCAR_CASO)
             found_rows = []
             search_summary = f"Resultados de la búsqueda para el pedido **{pedido}**:\n\n"
@@ -467,7 +637,7 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
 
     async def procesar_finalizacion(self, interaction, msg):
         import config
-        import utils.google_sheets as google_sheets
+        from utils.google_client_manager import get_sheets_client
         from tasks.panel import crear_embed_tarea
         from utils.state_manager import get_user_state, delete_user_state
         from datetime import datetime
@@ -481,11 +651,12 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             if not config.GOOGLE_SHEET_ID_TAREAS:
                 await interaction.followup.send('❌ Error: El ID de la hoja de tareas no está configurado.', ephemeral=True)
                 return
-            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
-            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+            from utils.google_sheets import obtener_tarea_por_id
+            datos_tarea = obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
                 await interaction.followup.send('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
@@ -497,9 +668,10 @@ class CantidadCasosModal(discord.ui.Modal, title='Finalizar Tarea'):
             now = datetime.now(tz)
             fecha_finalizacion = now.strftime('%d/%m/%Y %H:%M:%S')
             max_intentos_sheet = 3
+            from utils.google_sheets import finalizar_tarea_por_id_con_cantidad
             for intento in range(max_intentos_sheet):
                 try:
-                    google_sheets.finalizar_tarea_por_id_con_cantidad(
+                    finalizar_tarea_por_id_con_cantidad(
                         sheet_activas,
                         sheet_historial,
                         self.tarea_id,
@@ -628,6 +800,7 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
                 state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from utils.google_client_manager import get_sheets_client
             from datetime import datetime
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
@@ -642,7 +815,7 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
                 await interaction.response.send_message('❌ Error: La variable GOOGLE_SHEET_RANGE_ENVIOS no está configurada.', ephemeral=True)
                 state_manager.delete_user_state(user_id, "solicitudes_envios")
                 return
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             sheet_range = getattr(config, 'GOOGLE_SHEET_RANGE_ENVIOS', 'CAMBIO DE DIRECCIÓN 2025!A:M')
             hoja_nombre = None
@@ -670,41 +843,42 @@ class SolicitudEnviosModal(discord.ui.Modal, title='Detalles de la Solicitud de 
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
             agente_name = interaction.user.display_name
-            # Construir la fila según el header
-            header = rows[0] if rows else []
+            
+            # Armar la fila en el orden esperado según la hoja (igual que CasoModal)
             row_data = [
-                pedido,           # A - Número de Pedido
-                fecha_hora,       # B - Fecha
-                agente_name,      # C - Agente
-                numero_caso,      # D - Número de Caso
-                tipo_solicitud,   # E - Tipo de Solicitud
-                direccion_telefono, # F - Dirección/Teléfono/Datos
-                '',               # G - Referencia (Back Office)
-                '',               # H - Referencia (Back Office)
-                'Nadie',          # I - Agente Back
-                'No',             # J - Resuelto
-                observaciones     # K - Observaciones
+                pedido,                    # A - Número de pedido
+                fecha_hora,                # B - Fecha
+                agente_name,               # C - Agente carga
+                numero_caso,               # D - CASO ID WISE
+                tipo_solicitud,            # E - Solicitud
+                direccion_telefono,        # F - Dirección/Teléfono/Datos (Gestión Front)
+                '',                        # G - ZECO (ENTREGAR) / ANDRENAI OBLIGATORIO
+                '',                        # H - Referencia (Gestión BACK OFFICE)
+                'Nadie',                   # I - Agente Back (se setea abajo si existe)
+                'No',                      # J - Resuelto
+                observaciones,             # K - Observaciones
+                '',                        # L - ERROR
+                ''                         # M - ErrorEnvioCheck
             ]
-            # Ajustar la cantidad de columnas al header
+            
+            # Ajustar la cantidad de columnas al header (igual que CasoModal)
+            header = rows[0] if rows else []
             if len(row_data) < len(header):
-                row_data += [''] * (len(header) - len(row_data))
+                row_data.extend([''] * (len(header) - len(row_data)))
             elif len(row_data) > len(header):
                 row_data = row_data[:len(header)]
-            # Cargar valores por defecto en las columnas especiales
+            
+            # Buscar columnas especiales por nombre (igual que CasoModal)
             def normaliza_columna(nombre):
-                return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
-            idx_agente_back = None
-            idx_resuelto = None
-            for idx, col_name in enumerate(header):
-                norm = normaliza_columna(col_name)
-                if norm == normaliza_columna('Agente Back'):
-                    idx_agente_back = idx
-                if norm == normaliza_columna('Resuelto'):
-                    idx_resuelto = idx
-            if idx_agente_back is not None:
+                if not nombre:
+                    return ''
+                return str(nombre).strip().replace('\u200b', '').replace('\ufeff', '').lower()
+            
+            # Buscar índice de Agente Back si existe
+            idx_agente_back = next((i for i, h in enumerate(header) if 'agente back' in normaliza_columna(h)), None)
+            if idx_agente_back is not None and idx_agente_back < len(row_data):
                 row_data[idx_agente_back] = 'Nadie'
-            if idx_resuelto is not None:
-                row_data[idx_resuelto] = 'No'
+            
             sheet.append_row(row_data)
             confirmation_message = f"""✅ **Solicitud registrada exitosamente**\n\n📋 **Detalles de la solicitud:**\n• **N° de Pedido:** {pedido}\n• **N° de Caso:** {numero_caso}\n• **Tipo de Solicitud:** {tipo_solicitud}\n• **Agente:** {agente_name}\n• **Fecha:** {fecha_hora}\n• **Dirección y Teléfono:** {direccion_telefono}\n"""
             if observaciones:
@@ -736,7 +910,7 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
             custom_id="reembolsoZREInput",
             style=discord.TextStyle.short,
             required=True,
-            max_length=10
+            max_length=20
         )
         self.tarjeta = discord.ui.TextInput(
             label="Tarjeta",
@@ -803,6 +977,7 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
                 return
             
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from utils.google_client_manager import get_sheets_client
             from datetime import datetime
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
@@ -817,7 +992,7 @@ class ReembolsoModal(discord.ui.Modal, title='Detalles del Reembolso'):
                 await interaction.response.send_message('❌ Error: La variable SHEET_RANGE_REEMBOLSOS no está configurada.', ephemeral=True)
                 state_manager.delete_user_state(user_id, "reembolsos")
                 return
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             sheet_range = getattr(config, 'SHEET_RANGE_REEMBOLSOS', 'REEMBOLSOS!A:L')
             hoja_nombre = None
@@ -889,6 +1064,14 @@ class CancelacionModal(discord.ui.Modal, title='Registrar Cancelación'):
             required=True,
             max_length=100
         )
+        self.motivo = discord.ui.TextInput(
+            label="Motivo de Cancelación",
+            placeholder="Ingresa el motivo de la cancelación...",
+            custom_id="cancelacionMotivoInput",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=500
+        )
         self.observaciones = discord.ui.TextInput(
             label="Observaciones",
             placeholder="Observaciones (opcional)",
@@ -898,6 +1081,7 @@ class CancelacionModal(discord.ui.Modal, title='Registrar Cancelación'):
             max_length=1000
         )
         self.add_item(self.pedido)
+        self.add_item(self.motivo)
         self.add_item(self.observaciones)
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -907,20 +1091,26 @@ class CancelacionModal(discord.ui.Modal, title='Registrar Cancelación'):
         import pytz
         try:
             user_id = str(interaction.user.id)
-            pending_data = state_manager.get_user_state(user_id, "cancelaciones")
-            tipo_cancelacion = pending_data.get('tipoCancelacion', 'CANCELAR') if pending_data else 'CANCELAR'
             pedido = self.pedido.value.strip()
+            motivo = self.motivo.value.strip()
             observaciones = self.observaciones.value.strip()
             agente = interaction.user.display_name
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d/%m/%Y %H:%M:%S')
+            
+            # Validar campos obligatorios
+            if not pedido or not motivo:
+                await interaction.response.send_message('❌ Error: El número de pedido y el motivo de cancelación son obligatorios.', ephemeral=True)
+                return
+            
             # Guardar en Google Sheets
             from utils.google_sheets import initialize_google_sheets
+            from utils.google_client_manager import get_sheets_client
             if not config.GOOGLE_CREDENTIALS_JSON or not config.SPREADSHEET_ID_CASOS or not config.GOOGLE_SHEET_RANGE_CANCELACIONES:
                 await interaction.response.send_message('❌ Error de configuración para Google Sheets.', ephemeral=True)
                 return
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             sheet_range = config.GOOGLE_SHEET_RANGE_CANCELACIONES
             hoja_nombre = None
@@ -942,15 +1132,20 @@ class CancelacionModal(discord.ui.Modal, title='Registrar Cancelación'):
             header = rows[0] if rows else []
             def normaliza_columna(nombre):
                 return str(nombre).strip().replace(' ', '').replace('/', '').replace('-', '').lower()
-            # Buscar índices de columnas
+            # Buscar índices de columnas según la nueva estructura
             idx_pedido = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('Número de pedido')), None)
             idx_agente = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('Agente que carga')), None)
             idx_fecha = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('FECHA')), None)
             idx_solicitud = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('SOLICITUD')), None)
+            idx_motivo = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('MOTIVO DE CANCELACIÓN')), None)
             idx_frenado = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('FRENADO')), None)
             idx_reembolso = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('REEMBOLSO')), None)
+            idx_codigo_sap = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('CODIGO SAP (Gestión Back Office)')), None)
             idx_agente_back = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('AGENTE BACK')), None)
             idx_observaciones = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('OBSERVACIONES')), None)
+            idx_error = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('ERROR')), None)
+            idx_error_envio = next((i for i, col in enumerate(header) if normaliza_columna(col) == normaliza_columna('ErrorEnvioCheck')), None)
+            
             # Preparar la fila
             row_data = [''] * len(header)
             if idx_pedido is not None:
@@ -960,17 +1155,26 @@ class CancelacionModal(discord.ui.Modal, title='Registrar Cancelación'):
             if idx_fecha is not None:
                 row_data[idx_fecha] = fecha_hora
             if idx_solicitud is not None:
-                row_data[idx_solicitud] = tipo_cancelacion
+                row_data[idx_solicitud] = 'CANCELAR'
+            if idx_motivo is not None:
+                row_data[idx_motivo] = motivo
             if idx_frenado is not None:
                 row_data[idx_frenado] = 'Pendiente'
             if idx_reembolso is not None:
                 row_data[idx_reembolso] = 'Pendiente'
+            if idx_codigo_sap is not None:
+                row_data[idx_codigo_sap] = ''
             if idx_agente_back is not None:
                 row_data[idx_agente_back] = 'Nadie'
             if idx_observaciones is not None:
                 row_data[idx_observaciones] = observaciones
+            if idx_error is not None:
+                row_data[idx_error] = ''
+            if idx_error_envio is not None:
+                row_data[idx_error_envio] = ''
+            
             sheet.append_row(row_data)
-            confirmation_message = f"✅ **Cancelación registrada exitosamente**\n\n📋 **Detalles:**\n• **N° de Pedido:** {pedido}\n• **Tipo:** {tipo_cancelacion}\n• **Agente:** {agente}\n• **Fecha:** {fecha_hora}\n\nLa cancelación ha sido guardada en Google Sheets."
+            confirmation_message = f"✅ **Cancelación registrada exitosamente**\n\n📋 **Detalles:**\n• **N° de Pedido:** {pedido}\n• **Motivo:** {motivo}\n• **Agente:** {agente}\n• **Fecha:** {fecha_hora}\n\nLa cancelación ha sido guardada en Google Sheets."
             await interaction.response.send_message(confirmation_message, ephemeral=True)
             state_manager.delete_user_state(user_id, "cancelaciones")
         except Exception as error:
@@ -1030,6 +1234,7 @@ class ReclamosMLModal(discord.ui.Modal, title='Detalles del Reclamo ML'):
                 state_manager.delete_user_state(user_id, "reclamos_ml")
                 return
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from utils.google_client_manager import get_sheets_client
             from datetime import datetime
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
@@ -1044,7 +1249,7 @@ class ReclamosMLModal(discord.ui.Modal, title='Detalles del Reclamo ML'):
                 await interaction.response.send_message('❌ Error: La variable GOOGLE_SHEET_RANGE_RECLAMOS_ML no está configurada.', ephemeral=True)
                 state_manager.delete_user_state(user_id, "reclamos_ml")
                 return
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             sheet_range = getattr(config, 'GOOGLE_SHEET_RANGE_RECLAMOS_ML', 'SOLICITUDES CON RECLAMO ABIERTO 2025 ML!A:L')
             hoja_nombre = None
@@ -1168,6 +1373,7 @@ class PiezaFaltanteModal(discord.ui.Modal, title='Registrar Pieza Faltante'):
                 await interaction.response.send_message('❌ Error: Todos los campos obligatorios deben estar completos.', ephemeral=True)
                 return
             from utils.google_sheets import initialize_google_sheets, check_if_pedido_exists
+            from utils.google_client_manager import get_sheets_client
             from datetime import datetime
             import pytz
             if not config.GOOGLE_CREDENTIALS_JSON:
@@ -1179,7 +1385,7 @@ class PiezaFaltanteModal(discord.ui.Modal, title='Registrar Pieza Faltante'):
             if not config.GOOGLE_SHEET_RANGE_PIEZA_FALTANTE:
                 await interaction.response.send_message('❌ Error: La variable GOOGLE_SHEET_RANGE_PIEZA_FALTANTE no está configurada.', ephemeral=True)
                 return
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             sheet_range = config.GOOGLE_SHEET_RANGE_PIEZA_FALTANTE
             hoja_nombre = None
@@ -1203,32 +1409,25 @@ class PiezaFaltanteModal(discord.ui.Modal, title='Registrar Pieza Faltante'):
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
             agente_name = interaction.user.display_name
+            # Armar la fila en el orden esperado según la hoja (igual que CasoModal)
+            row_data = [
+                agente_name,               # A - Agente
+                pedido,                    # B - Número de pedido
+                id_wise,                   # C - ID WISE
+                fecha_hora,                # D - Fecha de envío del form
+                pieza,                     # E - Pieza faltante
+                sku,                       # F - SKU del producto
+                observaciones,             # G - Observaciones
+                '',                        # H - ERROR
+                ''                         # I - ErrorEnvioCheck
+            ]
+            
+            # Ajustar la cantidad de columnas al header (igual que CasoModal)
             header = rows[0] if rows else []
-            
-            # Función para normalizar nombres de columnas
-            def normaliza_columna(nombre):
-                if not nombre:
-                    return ''
-                return str(nombre).strip().replace('\u200b', '').replace('\ufeff', '').lower()
-            
-            # Obtener índices de columnas por nombre
-            pedido_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'número de pedido'), 0)
-            wise_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'id wise'), 1)
-            pieza_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'pieza faltante'), 2)
-            sku_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'sku del producto'), 3)
-            fecha_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'Fecha de envío del form'), 4)
-            agente_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'agente'), 5)
-            obs_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'observaciones'), 6)
-            
-            # Crear fila con datos en las posiciones correctas
-            row_data = [''] * len(header)
-            row_data[pedido_col] = pedido
-            row_data[wise_col] = id_wise
-            row_data[pieza_col] = pieza
-            row_data[sku_col] = sku
-            row_data[fecha_col] = fecha_hora
-            row_data[agente_col] = agente_name
-            row_data[obs_col] = observaciones
+            if len(row_data) < len(header):
+                row_data.extend([''] * (len(header) - len(row_data)))
+            elif len(row_data) > len(header):
+                row_data = row_data[:len(header)]
             
             sheet.append_row(row_data)
             confirmation_message = f"""✅ **Pieza faltante registrada exitosamente**\n\n📋 **Detalles:**\n• **N° de Pedido:** {pedido}\n• **ID Wise:** {id_wise}\n• **Pieza faltante:** {pieza}\n• **SKU:** {sku}\n• **Fecha:** {fecha_hora}\n"""

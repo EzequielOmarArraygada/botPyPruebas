@@ -6,6 +6,7 @@ import discord
 import json
 
 def initialize_google_sheets(credentials_json: str):
+    """Inicializar cliente de Google Sheets"""
     try:
         scopes = [
             'https://www.googleapis.com/auth/spreadsheets',
@@ -13,13 +14,10 @@ def initialize_google_sheets(credentials_json: str):
         ]
         
         # Validar que credentials_json sea un JSON válido
-        try:
-            if isinstance(credentials_json, str):
-                creds_dict = json.loads(credentials_json)
-            else:
-                creds_dict = credentials_json
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Error al parsear credenciales JSON: {e}")
+        if isinstance(credentials_json, str):
+            creds_dict = json.loads(credentials_json)
+        else:
+            creds_dict = credentials_json
         
         credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(credentials)

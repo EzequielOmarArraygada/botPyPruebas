@@ -28,6 +28,33 @@ def maybe_guild_decorator():
         pass
     return lambda x: x
 
+def check_back_office_permissions(interaction: discord.Interaction) -> bool:
+    """
+    Verifica si el usuario tiene permisos de Back Office.
+    Permite a usuarios con el rol SETUP_BO_ROL, administradores y usuarios en SETUP_USER_IDS.
+    """
+    # Verificar que el usuario sea un Member
+    if not isinstance(interaction.user, discord.Member):
+        return False
+    
+    # Administradores siempre pueden usar estos comandos
+    if interaction.user.guild_permissions.administrator:
+        return True
+    
+    # Verificar si el usuario está en la lista de IDs permitidos
+    setup_user_ids = getattr(config, 'SETUP_USER_IDS', [])
+    if setup_user_ids and str(interaction.user.id) in setup_user_ids:
+        return True
+    
+    # Verificar si el usuario tiene el rol de Back Office
+    bo_role_id = getattr(config, 'SETUP_BO_ROL', None)
+    if bo_role_id:
+        for role in interaction.user.roles:
+            if str(role.id) == str(bo_role_id):
+                return True
+    
+    return False
+
 class InteractionCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -53,6 +80,33 @@ class InteractionCommands(commands.Cog):
             print('Error al mostrar el modal de Factura A:', error)
             await interaction.response.send_message(
                 'Hubo un error al abrir el formulario de solicitud de Factura A. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+    @maybe_guild_decorator()
+    @app_commands.command(name="factura-b", description="Solicita el registro de Factura B")
+    async def factura_b(self, interaction: discord.Interaction):
+        target_cat = get_target_category_id()
+        if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en la categoría <#{target_cat}>.", ephemeral=True)
+            return
+        # Restricción de canal
+        if hasattr(config, 'TARGET_CHANNEL_ID_FAC_B') and str(interaction.channel_id) != str(config.TARGET_CHANNEL_ID_FAC_B):
+            await interaction.response.send_message(
+                f"Este comando solo puede ser usado en el canal <#{config.TARGET_CHANNEL_ID_FAC_B}>.", ephemeral=True)
+            return
+        try:
+            from interactions.select_menus import build_canal_compra_menu
+            view = build_canal_compra_menu()
+            await interaction.response.send_message(
+                '🧾 **Solicitud de Factura B**\n\nSelecciona el canal de compra para continuar:',
+                view=view,
+                ephemeral=True
+            )
+            print('Select menu de Canal de Compra mostrado al usuario.')
+        except Exception as error:
+            print('Error al mostrar el select menu de Canal de Compra:', error)
+            await interaction.response.send_message(
+                'Hubo un error al abrir el formulario de solicitud de Factura B. Por favor, inténtalo de nuevo.', ephemeral=True)
 
     @maybe_guild_decorator()
     @app_commands.command(name="tracking", description="Consulta el estado de un envío de Andreani")
@@ -176,8 +230,9 @@ class InteractionCommands(commands.Cog):
             if not config.SPREADSHEET_ID_BUSCAR_CASO:
                 await interaction.followup.send('❌ Error: El ID de la hoja de búsqueda no está configurado.', ephemeral=True)
                 return
-            # Inicializar cliente de Google Sheets
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            # Obtener cliente de Google Sheets
+            from utils.google_client_manager import get_sheets_client
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_BUSCAR_CASO)
             found_rows = []
             search_summary = f"Resultados de la búsqueda para el pedido **{pedido}**:\n\n"
@@ -274,19 +329,15 @@ class InteractionCommands(commands.Cog):
             await interaction.response.send_message(
                 f"Este comando solo puede ser usado en el canal <#{getattr(config, 'TARGET_CHANNEL_ID_CASOS_CANCELACION', '')}>.", ephemeral=True)
             return
-        from interactions.select_menus import build_tipo_cancelacion_menu
+        from interactions.modals import CancelacionModal
         from utils.state_manager import set_user_state, delete_user_state
         try:
-            view = build_tipo_cancelacion_menu()
             set_user_state(str(interaction.user.id), {"type": "cancelaciones", "paso": 1}, "cancelaciones")
-            await interaction.response.send_message(
-                content='Por favor, selecciona el tipo de cancelación:',
-                view=view,
-                ephemeral=True
-            )
-            print(f"Usuario {interaction.user} puesto en estado pendiente (cancelaciones, paso 1). Select Menu mostrado.")
+            modal = CancelacionModal()
+            await interaction.response.send_modal(modal)
+            print(f"Usuario {interaction.user} puesto en estado pendiente (cancelaciones, paso 1). Modal mostrado.")
         except Exception as error:
-            print('Error al mostrar el Select Menu de Tipo de Cancelación:', error)
+            print('Error al mostrar el Modal de Cancelación:', error)
             await interaction.response.send_message(
                 'Hubo un error al iniciar el formulario de registro de Cancelaciones. Por favor, inténtalo de nuevo.', ephemeral=True)
             delete_user_state(str(interaction.user.id), "cancelaciones")
@@ -294,6 +345,11 @@ class InteractionCommands(commands.Cog):
     @maybe_guild_decorator()
     @app_commands.command(name="reclamos-ml", description="Inicia el registro de un reclamo de Mercado Libre")
     async def reclamos_ml(self, interaction: discord.Interaction):
+        # Verificar permisos de Back Office
+        if not check_back_office_permissions(interaction):
+            await interaction.response.send_message('❌ No tienes permisos para usar este comando. Se requieren permisos de Back Office, administrador o estar autorizado.', ephemeral=True)
+            return
+        
         target_cat = get_target_category_id()
         if target_cat and getattr(interaction.channel, 'category_id', None) != target_cat:
             await interaction.response.send_message(
@@ -373,7 +429,7 @@ class InteractionCommands(commands.Cog):
                 return
             
             # Inicializar Google Sheets
-            client = initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_CASOS)
             
             # Contador de errores encontrados

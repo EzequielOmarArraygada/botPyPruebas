@@ -1,5 +1,12 @@
-from dotenv import load_dotenv
-load_dotenv()
+import os
+import sys
+import asyncio
+import discord
+import config
+# from dotenv import load_dotenv
+from discord.ext import commands
+
+# load_dotenv()
 
 import os
 valor_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
@@ -8,12 +15,6 @@ if valor_json is None:
 else:
     print("[DEBUG] GOOGLE_CREDENTIALS_JSON (primeros 200 chars):", valor_json[:200])
 
-import os
-import sys
-import asyncio
-import discord
-from discord.ext import commands
-import config
 
 # Configuración del bot temporal para redeploy
 intents = discord.Intents.default()

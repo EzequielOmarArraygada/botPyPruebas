@@ -7,11 +7,15 @@ import config
 import json
 from pathlib import Path
 from datetime import datetime
-import utils.google_sheets as google_sheets
+from utils.google_sheets import (
+    COLUMNAS_TAREAS_ACTIVAS, COLUMNAS_HISTORIAL, registrar_tarea_activa, agregar_evento_historial,
+    obtener_tarea_por_id, pausar_tarea_por_id, reanudar_tarea_por_id, obtener_tarea_activa_por_usuario
+)
 import asyncio
 import pytz
 import re
 import time
+from utils.google_client_manager import get_sheets_client, get_drive_client
 
 # Obtener el ID del canal desde la variable de entorno
 target_channel_id = int(getattr(config, 'TARGET_CHANNEL_ID_TAREAS', '0') or '0')
@@ -54,18 +58,65 @@ def guilds_decorator():
         return app_commands.guilds(discord.Object(id=guild_id))
     return lambda x: x
 
+def check_setup_permissions(interaction: discord.Interaction) -> bool:
+    """
+    Verifica si el usuario tiene permisos para usar comandos de setup.
+    Permite a administradores y usuarios específicos por ID.
+    """
+    # Verificar que el usuario sea un Member
+    if not isinstance(interaction.user, discord.Member):
+        return False
+    
+    # Administradores siempre pueden usar estos comandos
+    if interaction.user.guild_permissions.administrator:
+        return True
+    
+    # Verificar si el usuario está en la lista de IDs permitidos
+    setup_user_ids = getattr(config, 'SETUP_USER_IDS', [])
+    if setup_user_ids and str(interaction.user.id) in setup_user_ids:
+        return True
+    
+    return False
+
+def check_back_office_permissions(interaction: discord.Interaction) -> bool:
+    """
+    Verifica si el usuario tiene permisos de Back Office.
+    Permite a usuarios con el rol SETUP_BO_ROL, administradores y usuarios en SETUP_USER_IDS.
+    """
+    # Verificar que el usuario sea un Member
+    if not isinstance(interaction.user, discord.Member):
+        return False
+    
+    # Administradores siempre pueden usar estos comandos
+    if interaction.user.guild_permissions.administrator:
+        return True
+    
+    # Verificar si el usuario está en la lista de IDs permitidos
+    setup_user_ids = getattr(config, 'SETUP_USER_IDS', [])
+    if setup_user_ids and str(interaction.user.id) in setup_user_ids:
+        return True
+    
+    # Verificar si el usuario tiene el rol de Back Office
+    bo_role_id = getattr(config, 'SETUP_BO_ROL', None)
+    if bo_role_id:
+        for role in interaction.user.roles:
+            if str(role.id) == str(bo_role_id):
+                return True
+    
+    return False
+
 class TaskPanel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         print('[DEBUG] TaskPanel Cog inicializado')
 
     @app_commands.guilds(discord.Object(id=int(config.GUILD_ID)))
-    @app_commands.command(name='setup_panel_tareas', description='Publica el panel de tareas en el canal configurado (solo admins)')
+    @app_commands.command(name='setup_panel_tareas', description='Publica el panel de tareas en el canal configurado (admins y usuarios autorizados)')
     async def setup_panel_tareas(self, interaction: discord.Interaction):
         print('[DEBUG] Ejecutando /setup_panel_tareas')
-        # Solo admins pueden ejecutar
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message('No tienes permisos para usar este comando.', ephemeral=True)
+        # Verificar permisos (admins o usuarios autorizados)
+        if not check_setup_permissions(interaction):
+            await interaction.response.send_message('No tienes permisos para usar este comando. Se requieren permisos de administrador o estar autorizado.', ephemeral=True)
             return
         
         # Obtener el canal de tareas desde la configuración
@@ -93,6 +144,66 @@ class TaskPanel(commands.Cog):
     async def prueba(self, interaction: discord.Interaction):
         print('[DEBUG] Ejecutando /prueba')
         await interaction.response.send_message('¡Funciona el comando de prueba!', ephemeral=True)
+
+    @app_commands.command(name='verificar_tareas_sheet', description='Verifica y crea las hojas necesarias para tareas (admins y usuarios autorizados)')
+    async def verificar_tareas_sheet(self, interaction: discord.Interaction):
+        # Verificar permisos (admins o usuarios autorizados)
+        if not check_setup_permissions(interaction):
+            await interaction.response.send_message('No tienes permisos para usar este comando. Se requieren permisos de administrador o estar autorizado.', ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        
+        try:
+            # Inicializar Google Sheets
+            await interaction.followup.send('🔄 Inicializando Google Sheets...', ephemeral=True)
+            client = get_sheets_client()
+            
+            # Abrir spreadsheet
+            await interaction.followup.send('🔄 Abriendo spreadsheet...', ephemeral=True)
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            
+            # Obtener lista de hojas existentes
+            await interaction.followup.send('🔄 Verificando hojas existentes...', ephemeral=True)
+            hojas_existentes = [worksheet.title for worksheet in spreadsheet.worksheets()]
+            
+            await interaction.followup.send(f'📋 **Hojas existentes:**\n{", ".join(hojas_existentes)}', ephemeral=True)
+            
+            # Verificar si faltan hojas
+            hojas_requeridas = ['Tareas Activas', 'Historial']
+            hojas_faltantes = [hoja for hoja in hojas_requeridas if hoja not in hojas_existentes]
+            
+            if hojas_faltantes:
+                await interaction.followup.send(f'⚠️ **Hojas faltantes:** {", ".join(hojas_faltantes)}', ephemeral=True)
+                
+                # Crear hojas faltantes
+                for hoja in hojas_faltantes:
+                    await interaction.followup.send(f'🔄 Creando hoja "{hoja}"...', ephemeral=True)
+                    nueva_hoja = spreadsheet.add_worksheet(title=hoja, rows=1000, cols=20)
+                    
+                    # Agregar headers según el tipo de hoja
+                    if hoja == 'Tareas Activas':
+                        nueva_hoja.append_row(COLUMNAS_TAREAS_ACTIVAS)
+                    elif hoja == 'Historial':
+                        nueva_hoja.append_row(COLUMNAS_HISTORIAL)
+                
+                await interaction.followup.send('✅ **¡Hojas creadas exitosamente!**\n\nAhora puedes usar el panel de tareas.', ephemeral=True)
+            else:
+                await interaction.followup.send('✅ **Todas las hojas requeridas ya existen.**\n\nEl problema puede ser de permisos o estructura de datos.', ephemeral=True)
+                
+        except Exception as e:
+            error_msg = f'❌ **Error al verificar spreadsheet:**\n\n'
+            if "404" in str(e) or "not found" in str(e).lower():
+                error_msg += f'**Problema:** El spreadsheet no existe.\n\n'
+                error_msg += f'**ID del spreadsheet:** `{config.GOOGLE_SHEET_ID_TAREAS}`\n\n'
+                error_msg += f'**Solución:** Crea un nuevo spreadsheet y actualiza el ID en config.py'
+            elif "403" in str(e) or "permission" in str(e).lower():
+                error_msg += f'**Problema:** Error de permisos en Google Sheets.\n\n'
+                error_msg += f'**Error completo:** {str(e)}'
+            else:
+                error_msg += f'**Error completo:** {str(e)}'
+            
+            await interaction.followup.send(error_msg, ephemeral=True)
 
 class TaskPanelView(discord.ui.View):
     def __init__(self):
@@ -133,17 +244,12 @@ class TaskSelectMenu(discord.ui.Select):
         if self.values[0] == 'Otra':
             await interaction.response.send_modal(TaskObservacionesModal())
         else:
-            await interaction.response.defer()
             seleccion = self.values[0]
-            msg_tarea = await interaction.channel.send(
+            await interaction.response.send_message(
                 f'Tarea seleccionada: **{seleccion}**\nPresiona "Comenzar" para iniciar.',
-                view=TaskStartButtonView(seleccion)
+                view=TaskStartButtonView(seleccion),
+                ephemeral=True
             )
-            await asyncio.sleep(120)
-            try:
-                await msg_tarea.delete()
-            except:
-                pass
 
 class TaskSelectMenuView(discord.ui.View):
     def __init__(self):
@@ -163,22 +269,38 @@ class TaskStartButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         user_id = str(interaction.user.id)
-        # --- Google Sheets ---
-        client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
-        spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
-        sheet_activas = spreadsheet.worksheet('Tareas Activas')
-        sheet_historial = spreadsheet.worksheet('Historial')
-        usuario = str(interaction.user)
-        tarea = self.tarea
-        observaciones = ''
-        tz = pytz.timezone('America/Argentina/Buenos_Aires')
-        now = datetime.now(tz)
-        inicio = now.strftime('%d/%m/%Y %H:%M:%S')
+        
         try:
+            # --- Google Sheets ---
+            client = get_sheets_client()
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            
+            # Verificar qué hojas existen
+            hojas_existentes = [worksheet.title for worksheet in spreadsheet.worksheets()]
+            
+            # Verificar si existen las hojas requeridas
+            if 'Tareas Activas' not in hojas_existentes:
+                await interaction.followup.send(f'❌ **Error:** No existe la hoja "Tareas Activas" en el spreadsheet', ephemeral=True)
+                return
+            if 'Historial' not in hojas_existentes:
+                await interaction.followup.send(f'❌ **Error:** No existe la hoja "Historial" en el spreadsheet', ephemeral=True)
+                return
+            
+            sheet_activas = spreadsheet.worksheet('Tareas Activas')
+            sheet_historial = spreadsheet.worksheet('Historial')
+            
+            usuario = str(interaction.user)
+            tarea = self.tarea
+            observaciones = ''
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            inicio = now.strftime('%d/%m/%Y %H:%M:%S')
+            
             # Registrar tarea activa
-            tarea_id = google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
+            tarea_id = registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, observaciones, inicio)
+            
             # Agregar evento al historial
-            google_sheets.agregar_evento_historial(
+            agregar_evento_historial(
                 sheet_historial,
                 user_id,
                 tarea_id,
@@ -190,6 +312,7 @@ class TaskStartButton(discord.ui.Button):
                 'Inicio',         # tipo_evento
                 ''                # tiempo_pausada
             )
+            
             # Enviar embed al canal de registro (sin borrado)
             if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
                 canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
@@ -206,38 +329,50 @@ class TaskStartButton(discord.ui.Button):
                         'type': 'tarea',
                         'timestamp': time.time()
                     }, "tarea")
-            # Enviar mensaje de confirmación y borrarlo a los 2 minutos
-            msg_confirm = await interaction.channel.send(f'¡Tarea "{tarea}" iniciada y registrada!')
-            await asyncio.sleep(120)
-            try:
-                await msg_confirm.delete()
-            except:
-                pass
+            
+            # Enviar mensaje de confirmación ephemeral
+            await interaction.followup.send(f'✅ **¡Tarea "{tarea}" iniciada y registrada exitosamente!**', ephemeral=True)
+                
         except Exception as e:
+            error_msg = f'❌ **Error al registrar la tarea:**\n\n'
             if "ya tiene una tarea activa" in str(e):
-                await interaction.followup.send(f'❌ {str(e)}', ephemeral=True)
+                error_msg += f'**Problema:** {str(e)}'
+            elif "404" in str(e) or "not found" in str(e).lower():
+                error_msg += f'**Problema:** No se encontró el spreadsheet o las hojas.\n\n'
+                error_msg += f'**ID del spreadsheet:** `{config.GOOGLE_SHEET_ID_TAREAS}`\n'
+                error_msg += f'**Hojas requeridas:** `Tareas Activas`, `Historial`\n\n'
+                error_msg += f'**Error completo:** {str(e)}'
+            elif "403" in str(e) or "permission" in str(e).lower():
+                error_msg += f'**Problema:** Error de permisos en Google Sheets.\n\n'
+                error_msg += f'**Error completo:** {str(e)}'
             else:
-                await interaction.followup.send(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
+                error_msg += f'**Error completo:** {str(e)}'
+            
+            await interaction.followup.send(error_msg, ephemeral=True)
 
 class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
     observaciones = discord.ui.TextInput(label='Observaciones (opcional)', required=False, style=discord.TextStyle.paragraph)
 
     async def on_submit(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        # --- Google Sheets ---
-        client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
-        spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
-        sheet_activas = spreadsheet.worksheet('Tareas Activas')
-        sheet_historial = spreadsheet.worksheet('Historial')
-        usuario = str(interaction.user)
-        tarea = 'Otra'
-        obs = self.observaciones.value.strip()
-        tz = pytz.timezone('America/Argentina/Buenos_Aires')
-        now = datetime.now(tz)
-        inicio = now.strftime('%d/%m/%Y %H:%M:%S')
+        
         try:
-            tarea_id = google_sheets.registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
-            google_sheets.agregar_evento_historial(
+            # --- Google Sheets ---
+            client = get_sheets_client()
+            spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
+            sheet_activas = spreadsheet.worksheet('Tareas Activas')
+            sheet_historial = spreadsheet.worksheet('Historial')
+            
+            usuario = str(interaction.user)
+            tarea = 'Otra'
+            obs = self.observaciones.value.strip()
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz)
+            inicio = now.strftime('%d/%m/%Y %H:%M:%S')
+            
+            tarea_id = registrar_tarea_activa(sheet_activas, user_id, usuario, tarea, obs, inicio)
+            
+            agregar_evento_historial(
                 sheet_historial,
                 user_id,
                 tarea_id,
@@ -249,6 +384,7 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 'Inicio',         # tipo_evento
                 ''                # tiempo_pausada
             )
+            
             # Enviar embed al canal de registro (sin borrado)
             if config.TARGET_CHANNEL_ID_TAREAS_REGISTRO:
                 canal_registro = interaction.guild.get_channel(int(config.TARGET_CHANNEL_ID_TAREAS_REGISTRO))
@@ -276,10 +412,21 @@ class TaskObservacionesModal(discord.ui.Modal, title='Registrar Observaciones'):
                 ephemeral=True
             )
         except Exception as e:
+            error_msg = f'❌ **Error al registrar la tarea:**\n\n'
             if "ya tiene una tarea activa" in str(e):
-                await interaction.response.send_message(f'❌ {str(e)}', ephemeral=True)
+                error_msg += f'**Problema:** {str(e)}'
+            elif "404" in str(e) or "not found" in str(e).lower():
+                error_msg += f'**Problema:** No se encontró el spreadsheet o las hojas.\n\n'
+                error_msg += f'**ID del spreadsheet:** `{config.GOOGLE_SHEET_ID_TAREAS}`\n'
+                error_msg += f'**Hojas requeridas:** `Tareas Activas`, `Historial`\n\n'
+                error_msg += f'**Error completo:** {str(e)}'
+            elif "403" in str(e) or "permission" in str(e).lower():
+                error_msg += f'**Problema:** Error de permisos en Google Sheets.\n\n'
+                error_msg += f'**Error completo:** {str(e)}'
             else:
-                await interaction.response.send_message(f'❌ Error al registrar la tarea: {str(e)}', ephemeral=True)
+                error_msg += f'**Error completo:** {str(e)}'
+            
+            await interaction.response.send_message(error_msg, ephemeral=True)
 
 def crear_embed_tarea(user, tarea, observaciones, inicio, estado, tiempo_pausado='00:00:00', cantidad_casos=None):
     """
@@ -388,11 +535,11 @@ class PausarReanudarButton(discord.ui.Button):
         await interaction.response.defer()
         
         try:
-            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
-            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+            datos_tarea = obtener_tarea_por_id(sheet_activas, self.tarea_id)
             if not datos_tarea:
                 await interaction.followup.send('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
@@ -403,10 +550,10 @@ class PausarReanudarButton(discord.ui.Button):
             
             if datos_tarea['estado'].lower() == 'en proceso':
                 # Pausar la tarea
-                google_sheets.pausar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
+                pausar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
                 
                 # Volver a obtener los datos actualizados
-                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+                datos_tarea_actualizados = obtener_tarea_por_id(sheet_activas, self.tarea_id)
                 if not datos_tarea_actualizados:
                     await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
                     return
@@ -433,10 +580,10 @@ class PausarReanudarButton(discord.ui.Button):
                 
             elif datos_tarea['estado'].lower() == 'pausada':
                 # Reanudar la tarea
-                google_sheets.reanudar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
+                reanudar_tarea_por_id(sheet_activas, sheet_historial, self.tarea_id, str(interaction.user), fecha_actual)
                 
                 # Volver a obtener los datos actualizados
-                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, self.tarea_id)
+                datos_tarea_actualizados = obtener_tarea_por_id(sheet_activas, self.tarea_id)
                 if not datos_tarea_actualizados:
                     await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
                     return
@@ -569,11 +716,11 @@ class PausarReanudarButtonPersistent(discord.ui.Button):
                 import utils.google_sheets as google_sheets
                 import config
                 
-                client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+                client = get_sheets_client()
                 spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
                 sheet_activas = spreadsheet.worksheet('Tareas Activas')
                 
-                datos_tarea = google_sheets.obtener_tarea_activa_por_usuario(sheet_activas, user_id)
+                datos_tarea = obtener_tarea_activa_por_usuario(sheet_activas, user_id)
                 if datos_tarea:
                     tarea_id = datos_tarea['tarea_id']
                 else:
@@ -586,11 +733,11 @@ class PausarReanudarButtonPersistent(discord.ui.Button):
                 import utils.google_sheets as google_sheets
                 import config
                 
-                client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+                client = get_sheets_client()
                 spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
                 sheet_activas = spreadsheet.worksheet('Tareas Activas')
                 
-                datos_tarea = google_sheets.obtener_tarea_activa_por_usuario(sheet_activas, user_id)
+                datos_tarea = obtener_tarea_activa_por_usuario(sheet_activas, user_id)
                 if datos_tarea:
                     tarea_id = datos_tarea['tarea_id']
                 else:
@@ -603,12 +750,12 @@ class PausarReanudarButtonPersistent(discord.ui.Button):
                 return
             
             # Ahora proceder con la lógica de pausar/reanudar
-            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             sheet_historial = spreadsheet.worksheet('Historial')
             
-            datos_tarea = google_sheets.obtener_tarea_por_id(sheet_activas, tarea_id)
+            datos_tarea = obtener_tarea_por_id(sheet_activas, tarea_id)
             if not datos_tarea:
                 await interaction.followup.send('❌ No se encontró la tarea especificada.', ephemeral=True)
                 return
@@ -619,10 +766,10 @@ class PausarReanudarButtonPersistent(discord.ui.Button):
             
             if datos_tarea['estado'].lower() == 'en proceso':
                 # Pausar la tarea
-                google_sheets.pausar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, str(interaction.user), fecha_actual)
+                pausar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, str(interaction.user), fecha_actual)
                 
                 # Volver a obtener los datos actualizados
-                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, tarea_id)
+                datos_tarea_actualizados = obtener_tarea_por_id(sheet_activas, tarea_id)
                 if not datos_tarea_actualizados:
                     await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
                     return
@@ -648,10 +795,10 @@ class PausarReanudarButtonPersistent(discord.ui.Button):
                 
             elif datos_tarea['estado'].lower() == 'pausada':
                 # Reanudar la tarea
-                google_sheets.reanudar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, str(interaction.user), fecha_actual)
+                reanudar_tarea_por_id(sheet_activas, sheet_historial, tarea_id, str(interaction.user), fecha_actual)
                 
                 # Volver a obtener los datos actualizados
-                datos_tarea_actualizados = google_sheets.obtener_tarea_por_id(sheet_activas, tarea_id)
+                datos_tarea_actualizados = obtener_tarea_por_id(sheet_activas, tarea_id)
                 if not datos_tarea_actualizados:
                     await interaction.followup.send('❌ Error al obtener los datos actualizados de la tarea.', ephemeral=True)
                     return
@@ -696,11 +843,11 @@ class FinalizarButtonPersistent(discord.ui.Button):
             import utils.google_sheets as google_sheets
             import config
             
-            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.GOOGLE_SHEET_ID_TAREAS)
             sheet_activas = spreadsheet.worksheet('Tareas Activas')
             
-            datos_tarea = google_sheets.obtener_tarea_activa_por_usuario(sheet_activas, user_id)
+            datos_tarea = obtener_tarea_activa_por_usuario(sheet_activas, user_id)
             if not datos_tarea:
                 await interaction.response.send_message('❌ No se encontró una tarea activa para finalizar.', ephemeral=True)
                 return
@@ -724,6 +871,7 @@ class PanelComandosView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(FacturaAButton())
+        self.add_item(FacturaBButton())
         self.add_item(CambiosDevolucionesButton())
         self.add_item(SolicitudesEnviosButton())
         self.add_item(TrackingButton())
@@ -806,6 +954,7 @@ class IniciarBuscarCasoButton(discord.ui.Button):
 class FacturaAButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Factura A', emoji='🧾', style=discord.ButtonStyle.success, custom_id='panel_factura_a')
+        
     async def callback(self, interaction: discord.Interaction):
         try:
             from config import TARGET_CHANNEL_ID_FAC_A
@@ -814,7 +963,7 @@ class FacturaAButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura A:', view=IniciarFacturaAView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -836,6 +985,65 @@ class FacturaAButton(discord.ui.Button):
             if not interaction.response.is_done():
                 await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
 
+class FacturaBButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='Factura B', emoji='🧾', style=discord.ButtonStyle.success, custom_id='panel_factura_b')
+        
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            from config import TARGET_CHANNEL_ID_FAC_B
+            canal_id = safe_int(TARGET_CHANNEL_ID_FAC_B)
+            if canal_id:
+                canal = interaction.guild.get_channel(canal_id)
+                if canal:
+                    await interaction.response.defer()
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
+                    msg = await canal.send(f'🧾 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de Factura B:', view=IniciarFacturaBView(interaction.user.id))
+                    await asyncio.sleep(20)
+                    try:
+                        await msg_panel.delete()
+                    except:
+                        pass
+                    await asyncio.sleep(100)
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                    return
+                else:
+                    await interaction.response.send_message('No se encontró el canal de Factura B.', ephemeral=True)
+            else:
+                await interaction.response.send_message('No se configuró el canal de Factura B.', ephemeral=True)
+        except Exception as e:
+            print(f'Error en FacturaBButton: {e}')
+            if not interaction.response.is_done():
+                await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+
+class IniciarFacturaBView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=300)
+        self.add_item(IniciarFacturaBButton(user_id))
+
+class IniciarFacturaBButton(discord.ui.Button):
+    def __init__(self, user_id):
+        super().__init__(label='Iniciar solicitud de Factura B', style=discord.ButtonStyle.primary, custom_id=f'init_factura_b_{user_id}')
+        self.user_id = user_id
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            if str(interaction.user.id) != str(self.user_id):
+                await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
+                return
+            from interactions.select_menus import build_canal_compra_menu
+            view = build_canal_compra_menu()
+            await interaction.response.send_message(
+                '🧾 **Solicitud de Factura B**\n\nSelecciona el canal de compra para continuar:',
+                view=view,
+                ephemeral=True
+            )
+        except Exception as e:
+            print(f'Error en IniciarFacturaBButton: {e}')
+            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
+
 class CambiosDevolucionesButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Cambios/Devoluciones', emoji='🔄', style=discord.ButtonStyle.success, custom_id='panel_cambios_devoluciones')
@@ -847,7 +1055,7 @@ class CambiosDevolucionesButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'🔄 {interaction.user.mention}, haz clic en el botón para iniciar el registro de Cambios/Devoluciones:', view=IniciarCambiosDevolucionesView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -903,7 +1111,7 @@ class SolicitudesEnviosButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'🚚 {interaction.user.mention}, haz clic en el botón para iniciar una solicitud de envío:', view=IniciarSolicitudesEnviosView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -946,7 +1154,9 @@ class IniciarSolicitudesEnviosButton(discord.ui.Button):
             await interaction.response.send_message('Por favor, selecciona el tipo de solicitud de envío:', view=view, ephemeral=True)
         except Exception as e:
             print(f'Error en IniciarSolicitudesEnviosButton: {e}')
-            await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
+            import traceback
+            traceback.print_exc()
+            await interaction.response.send_message(f'❌ Error al iniciar el flujo: {str(e)}', ephemeral=True)
 
 class TrackingButton(discord.ui.Button):
     def __init__(self):
@@ -959,7 +1169,7 @@ class TrackingButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'📦 {interaction.user.mention}, haz clic en el botón para consultar el estado de un envío:', view=IniciarTrackingView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -992,7 +1202,7 @@ class BuscarCasoButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'🔍 {interaction.user.mention}, haz clic en el botón para buscar un caso:', view=IniciarBuscarCasoView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -1025,7 +1235,7 @@ class ReembolsosButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'💸 {interaction.user.mention}, haz clic en el botón para iniciar el registro de un reembolso:', view=IniciarReembolsosView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -1081,7 +1291,7 @@ class CancelacionesButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'❌ {interaction.user.mention}, haz clic en el botón para iniciar el registro de una cancelación:', view=IniciarCancelacionesView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -1119,9 +1329,9 @@ class IniciarCancelacionesButton(discord.ui.Button):
                 return
             from utils.state_manager import set_user_state
             set_user_state(str(interaction.user.id), {"type": "cancelaciones", "paso": 1}, "cancelaciones")
-            from interactions.select_menus import build_tipo_cancelacion_menu
-            view = build_tipo_cancelacion_menu()
-            await interaction.response.send_message('Por favor, selecciona el tipo de cancelación:', view=view, ephemeral=True)
+            from interactions.modals import CancelacionModal
+            modal = CancelacionModal()
+            await interaction.response.send_modal(modal)
         except Exception as e:
             print(f'Error en IniciarCancelacionesButton: {e}')
             await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
@@ -1130,6 +1340,11 @@ class ReclamosMLButton(discord.ui.Button):
     def __init__(self):
         super().__init__(label='Reclamos ML', emoji='🛒', style=discord.ButtonStyle.primary, custom_id='panel_reclamos_ml')
     async def callback(self, interaction: discord.Interaction):
+        # Verificar permisos de Back Office
+        if not check_back_office_permissions(interaction):
+            await interaction.response.send_message('❌ No tienes permisos para usar este comando. Se requieren permisos de Back Office, administrador o estar autorizado.', ephemeral=True)
+            return
+        
         try:
             from config import TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML
             canal_id = safe_int(TARGET_CHANNEL_ID_CASOS_RECLAMOS_ML or '0')
@@ -1137,7 +1352,7 @@ class ReclamosMLButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
                     msg = await canal.send(f'🛒 {interaction.user.mention}, haz clic en el botón para iniciar un reclamo ML:', view=IniciarReclamosMLView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
@@ -1193,8 +1408,8 @@ class PiezaFaltanteButton(discord.ui.Button):
                 canal = interaction.guild.get_channel(canal_id)
                 if canal:
                     await interaction.response.defer()
-                    msg_panel = await interaction.followup.send('✅ Revisa el canal correspondiente para continuar el flujo.')
-                    msg = await canal.send(f'🧩 {interaction.user.mention}, haz clic en el botón para registrar una pieza faltante:', view=IniciarPiezaFaltanteView(interaction.user.id))
+                    msg_panel = await interaction.followup.send(f'✅ Revisa el canal <#{canal_id}> para continuar el flujo.')
+                    msg = await canal.send(f'🧩 {interaction.user.mention}, haz clic en el botón para registrar una pieza faltante, no te olvides de antes llenar el formulario: https://forms.office.com/pages/responsepage.aspx?id=cm15Q6kOD060d7nTy0qsWd37Phzx2QlOgQ9NVyvXFPZUOUVFWlNaQzdTQkNFVlBHTTJSREUxWlRYUi4u&route=shorturl:', view=IniciarPiezaFaltanteView(interaction.user.id))
                     await asyncio.sleep(20)
                     try:
                         await msg_panel.delete()
@@ -1240,10 +1455,11 @@ class PanelComandos(commands.Cog):
         self.bot = bot
 
     @app_commands.guilds(discord.Object(id=int(config.GUILD_ID)))
-    @app_commands.command(name='setup_panel_comandos', description='Publica el panel de comandos en el canal de guía (solo admins)')
+    @app_commands.command(name='setup_panel_comandos', description='Publica el panel de comandos en el canal de guía (admins y usuarios autorizados)')
     async def setup_panel_comandos(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message('No tienes permisos para usar este comando.', ephemeral=True)
+        # Verificar permisos (admins o usuarios autorizados)
+        if not check_setup_permissions(interaction):
+            await interaction.response.send_message('No tienes permisos para usar este comando. Se requieren permisos de administrador o estar autorizado.', ephemeral=True)
             return
         # Canal de guía
         canal_id = getattr(config, 'TARGET_CHANNEL_ID_GUIA_COMANDOS', None)

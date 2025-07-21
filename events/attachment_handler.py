@@ -1,7 +1,8 @@
 import discord
 from discord.ext import commands
 from utils.state_manager import get_user_state, delete_user_state, cleanup_expired_states
-from utils.google_drive import initialize_google_drive, find_or_create_drive_folder, upload_file_to_drive
+from utils.google_drive import find_or_create_drive_folder, upload_file_to_drive
+from utils.google_client_manager import get_drive_client, get_sheets_client
 import config
 from datetime import datetime
 import pytz
@@ -20,18 +21,26 @@ class SolicitudCargadaButton(discord.ui.Button):
         self.message_id = message_id
 
     async def callback(self, interaction: discord.Interaction):
-        # Verificar si el usuario tiene el rol "Bgh Back Office" o es Ezequiel Arraygada
+        # Verificar si el usuario tiene el rol configurado o es Ezequiel Arraygada
         has_role = False
         user_name = interaction.user.display_name
         
-        # Verificar rol "Bgh Back Office" - solo funciona en contexto de guild
+        # Verificar rol configurado - solo funciona en contexto de guild
         if interaction.guild:
             member = interaction.guild.get_member(interaction.user.id)
             if member:
-                for role in member.roles:
-                    if role.name == "Bgh Back Office":
-                        has_role = True
-                        break
+                bo_role_id = getattr(config, 'SETUP_BO_ROL', None)
+                if bo_role_id:
+                    for role in member.roles:
+                        if str(role.id) == str(bo_role_id):
+                            has_role = True
+                            break
+                else:
+                    # Fallback: verificar por nombre si no hay ID configurado
+                    for role in member.roles:
+                        if role.name == "Bgh Back Office":
+                            has_role = True
+                            break
         
         # Verificar si es Ezequiel Arraygada
         if user_name == "Ezequiel Arraygada":
@@ -48,8 +57,7 @@ class SolicitudCargadaButton(discord.ui.Button):
                 return
             
             # Actualizar Google Sheets
-            import utils.google_sheets as google_sheets
-            client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+            client = get_sheets_client()
             spreadsheet = client.open_by_key(config.SPREADSHEET_ID_FAC_A)
             sheet_range = getattr(config, 'SHEET_RANGE_FAC_A', 'A:E')
             
@@ -78,8 +86,9 @@ class SolicitudCargadaButton(discord.ui.Button):
                 return
             
             header_row = rows[0]
-            pedido_col = google_sheets.get_col_index(header_row, 'Número de Pedido')
-            check_bo_col = google_sheets.get_col_index(header_row, 'Check BO Carga')
+            from utils.google_sheets import get_col_index
+            pedido_col = get_col_index(header_row, 'Número de Pedido')
+            check_bo_col = get_col_index(header_row, 'Check BO Carga')
             
             if pedido_col is None:
                 await interaction.response.send_message('❌ No se encontró la columna "Número de Pedido" en la hoja.', ephemeral=True)
@@ -111,7 +120,7 @@ class SolicitudCargadaButton(discord.ui.Button):
             self.disabled = True
             
             # Actualizar el embed
-            if interaction.message.embeds:
+            if interaction.message and interaction.message.embeds:
                 embed = interaction.message.embeds[0]
                 embed.color = discord.Color.green()
                 embed.add_field(
@@ -141,9 +150,7 @@ class AttachmentHandler(commands.Cog):
     async def get_drive_service(self):
         """Get or initialize Google Drive service"""
         if self.drive_service is None:
-            if not config.GOOGLE_CREDENTIALS_JSON:
-                raise ValueError("GOOGLE_CREDENTIALS_JSON no está configurado")
-            self.drive_service = initialize_google_drive(config.GOOGLE_CREDENTIALS_JSON)
+            self.drive_service = get_drive_client()
         return self.drive_service
 
     @commands.Cog.listener()
@@ -155,10 +162,13 @@ class AttachmentHandler(commands.Cog):
         user_id = str(message.author.id)
         cleanup_expired_states()
         pending_data = get_user_state(user_id, "facturaA")
-        delete_user_state(user_id, "facturaA")
         
-        # Solo manejar si el usuario está esperando adjuntos para Factura A
-        if pending_data and pending_data.get('type') == 'facturaA' and message.attachments:
+        # Solo manejar si el usuario está esperando adjuntos para Factura A Y está en el canal correcto
+        if (pending_data and pending_data.get('type') == 'facturaA' and message.attachments and 
+            str(message.channel.id) == str(config.TARGET_CHANNEL_ID_FAC_A)):
+            # Eliminar el estado SOLO si vamos a procesar el mensaje
+            delete_user_state(user_id, "facturaA")
+            
             pedido = pending_data.get('pedido')
             solicitud_id = pending_data.get('solicitud_id')
             if not pedido:
@@ -171,30 +181,63 @@ class AttachmentHandler(commands.Cog):
                 
                 # Buscar o crear carpeta del pedido
                 parent_folder_id = getattr(config, 'PARENT_DRIVE_FOLDER_ID', None)
+                print(f"🔍 DEBUG - PARENT_DRIVE_FOLDER_ID desde config: '{parent_folder_id}'")
+                
                 if not parent_folder_id:
-                    print("Advertencia: PARENT_DRIVE_FOLDER_ID no está configurado, creando carpeta en raíz")
+                    print("❌ Advertencia: PARENT_DRIVE_FOLDER_ID no está configurado, creando carpeta en raíz")
+                else:
+                    print(f"✅ PARENT_DRIVE_FOLDER_ID configurado: '{parent_folder_id}'")
+                
+                # Opción 1: Crear carpeta específica para el pedido
                 folder_name = f'FacturaA_{pedido}'
-                print(f"DEBUG: Creando carpeta con nombre: {folder_name}")
+                print(f"🔍 DEBUG - Nombre de carpeta a crear: '{folder_name}'")
+                print(f"🔍 DEBUG - Llamando find_or_create_drive_folder con parent_id: '{parent_folder_id}'")
+                
                 folder_id = find_or_create_drive_folder(drive_service, parent_folder_id or "", folder_name)
+                print(f"🔍 DEBUG - ID de carpeta retornado: '{folder_id}'")
+                
+                # Opción 2: Usar directamente la carpeta "Adjuntos solicitudes" (comentado por ahora)
+                # folder_id = parent_folder_id
+                # print(f"🔍 DEBUG - Usando carpeta padre directamente: '{folder_id}'")
                 
                 # Subir cada adjunto
                 uploaded_files = []
+                
                 for attachment in message.attachments:
-                    uploaded = upload_file_to_drive(drive_service, folder_id, attachment)
-                    uploaded_files.append(uploaded)
+                    try:
+                        uploaded = upload_file_to_drive(drive_service, folder_id, attachment)
+                        uploaded_files.append(uploaded)
+                        
+                        # Delay adicional entre archivos para mayor seguridad
+                        import asyncio
+                        await asyncio.sleep(0.5)
+                            
+                    except Exception as upload_error:
+                        # Mostrar error detallado en Discord
+                        error_details = f"❌ **Error al subir {attachment.filename}:**\n{str(upload_error)}"
+                        
+                        # Agregar debug info si está disponible
+                        if hasattr(upload_file_to_drive, 'debug_info') and upload_file_to_drive.debug_info:
+                            error_details = f"{upload_file_to_drive.debug_info}\n\n{error_details}"
+                            upload_file_to_drive.debug_info = ""
+                        
+                        await message.reply(error_details)
+                        return
                 
                 # Confirmar al usuario
                 file_names = ', '.join([f["name"] for f in uploaded_files])
-                await message.reply(f'✅ Archivos subidos a Google Drive para el pedido {pedido}: {file_names}')
+                success_message = f'✅ **Archivos subidos exitosamente**\n\n📁 **Pedido:** {pedido}\n📎 **Archivos:** {file_names}'
                 
+                await message.reply(success_message)
+                
+                # Solo enviar embed con botón de confirmación para Factura A
                 # Buscar información del caso en Google Sheets para crear el embed
                 if not config.GOOGLE_CREDENTIALS_JSON or not config.SPREADSHEET_ID_FAC_A:
                     print("Advertencia: Credenciales de Google no configuradas para buscar información del caso")
                     caso_info = "N/A"
                     fecha_carga = "N/A"
                 else:
-                    import utils.google_sheets as google_sheets
-                    client = google_sheets.initialize_google_sheets(config.GOOGLE_CREDENTIALS_JSON)
+                    client = get_sheets_client()
                     spreadsheet = client.open_by_key(config.SPREADSHEET_ID_FAC_A)
                     sheet_range = getattr(config, 'SHEET_RANGE_FAC_A', 'A:E')
                     
@@ -247,7 +290,7 @@ class AttachmentHandler(commands.Cog):
                                         fecha_carga = str(row[fecha_col])
                                     break
                 
-                # Crear y enviar el embed
+                # Crear y enviar el embed solo para Factura A
                 embed = discord.Embed(
                     title='🧾 Nueva Solicitud de Factura A',
                     description=f'Se ha cargado una nueva solicitud de Factura A con archivos adjuntos.',
@@ -290,13 +333,20 @@ class AttachmentHandler(commands.Cog):
                 # Crear la vista con el botón
                 view = SolicitudCargadaView(pedido, caso_info, message.author.display_name, fecha_carga, str(message.id))
                 
-                # Enviar el embed mencionando a Bgh Back Office
-                Bgh_Back_Office_id = 1388209760314331297 
-                await message.channel.send(
-                    content=f'<@&{Bgh_Back_Office_id}> Nueva solicitud de Factura A cargada',
-                    embed=embed,
-                    view=view
-                )
+                # Enviar el embed mencionando al rol configurado
+                bo_role_id = getattr(config, 'SETUP_BO_ROL', None)
+                if bo_role_id:
+                    await message.channel.send(
+                        content=f'<@&{bo_role_id}> Nueva solicitud de Factura A cargada',
+                        embed=embed,
+                        view=view
+                    )
+                else:
+                    await message.channel.send(
+                        content='Nueva solicitud de Factura A cargada',
+                        embed=embed,
+                        view=view
+                    )
                 
             except Exception as error:
                 print(f'Error al subir adjuntos a Google Drive para Factura A: {error}')
