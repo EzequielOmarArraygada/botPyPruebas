@@ -907,8 +907,13 @@ class IniciarFacturaAButton(discord.ui.Button):
             if str(interaction.user.id) != str(self.user_id):
                 await interaction.response.send_message('Solo el usuario mencionado puede iniciar este flujo.', ephemeral=True)
                 return
+            
             from interactions.modals import FacturaAModal
             await interaction.response.send_modal(FacturaAModal())
+            
+        except ImportError as e:
+            print(f'Error de importación en IniciarFacturaAButton: {e}')
+            await interaction.response.send_message('❌ Error interno: No se pudo cargar el formulario. Contacta al administrador.', ephemeral=True)
         except Exception as e:
             print(f'Error en IniciarFacturaAButton: {e}')
             await interaction.response.send_message('❌ Error al iniciar el flujo. Por favor, inténtalo de nuevo.', ephemeral=True)
@@ -979,9 +984,9 @@ class FacturaAButton(discord.ui.Button):
                         pass
                     return
                 else:
-                    await interaction.response.send_message('No se encontró el canal de Factura A.', ephemeral=True)
+                    await interaction.response.send_message('❌ No se encontró el canal de Factura A. Verifica la configuración del bot.', ephemeral=True)
             else:
-                await interaction.response.send_message('No se configuró el canal de Factura A.', ephemeral=True)
+                await interaction.response.send_message('❌ No se configuró el canal de Factura A. Contacta al administrador para configurar TARGET_CHANNEL_ID_FAC_A.', ephemeral=True)
         except Exception as e:
             print(f'Error en FacturaAButton: {e}')
             if not interaction.response.is_done():

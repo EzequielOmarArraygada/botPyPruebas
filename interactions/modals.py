@@ -62,18 +62,35 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             caso = self.caso.value.strip()
             email = self.email.value.strip()
             descripcion = self.descripcion.value.strip()
+            
             if not pedido or not caso or not email:
                 await interaction.response.send_message('❌ Error: Los campos Pedido, Caso y Email son requeridos.', ephemeral=True)
                 return
+                
+            # Verificar que las credenciales estén configuradas
             if not config.GOOGLE_CREDENTIALS_JSON:
-                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas. Contacta al administrador.', ephemeral=True)
                 return
+                
             if not config.SPREADSHEET_ID_FAC_A:
-                await interaction.response.send_message('❌ Error: El ID de la hoja de Factura A no está configurado.', ephemeral=True)
+                await interaction.response.send_message('❌ Error: El ID de la hoja de Factura A no está configurado. Contacta al administrador.', ephemeral=True)
                 return
             
+            # Verificar que el cliente de Google Sheets esté disponible
             client = get_sheets_client()
-            spreadsheet = client.open_by_key(config.SPREADSHEET_ID_FAC_A)
+            if not client:
+                await interaction.response.send_message('❌ Error: No se pudo conectar a Google Sheets. El servicio puede estar temporalmente no disponible. Por favor, inténtalo de nuevo en unos minutos.', ephemeral=True)
+                return
+            
+            # Mostrar mensaje de "procesando" mientras se trabaja con Google Sheets
+            await interaction.response.defer(thinking=True)
+            
+            try:
+                spreadsheet = client.open_by_key(config.SPREADSHEET_ID_FAC_A)
+            except Exception as e:
+                await interaction.followup.send(f'❌ Error al abrir la hoja de Google Sheets: {str(e)}', ephemeral=True)
+                return
+                
             sheet_range = getattr(config, 'SHEET_RANGE_FAC_A', 'A:E')
             hoja_nombre = None
             if '!' in sheet_range:
@@ -86,30 +103,50 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
                     sheet_range_puro = sheet_range
             else:
                 sheet_range_puro = sheet_range
-            if hoja_nombre:
-                sheet = spreadsheet.worksheet(hoja_nombre)
-            else:
-                sheet = spreadsheet.sheet1
-            rows = sheet.get(sheet_range_puro)
-            is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
-            if is_duplicate:
-                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Factura A.', ephemeral=True)
+                
+            try:
+                if hoja_nombre:
+                    sheet = spreadsheet.worksheet(hoja_nombre)
+                else:
+                    sheet = spreadsheet.sheet1
+            except Exception as e:
+                await interaction.followup.send(f'❌ Error al acceder a la hoja: {str(e)}', ephemeral=True)
                 return
+                
+            try:
+                rows = sheet.get(sheet_range_puro)
+            except Exception as e:
+                await interaction.followup.send(f'❌ Error al leer datos de la hoja: {str(e)}', ephemeral=True)
+                return
+                
+            try:
+                is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
+            except Exception as e:
+                await interaction.followup.send(f'❌ Error al verificar duplicados: {str(e)}', ephemeral=True)
+                return
+                
+            if is_duplicate:
+                await interaction.followup.send(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Factura A.', ephemeral=True)
+                return
+                
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
             now = datetime.now(tz)
             fecha_hora = now.strftime('%d-%m-%Y %H:%M:%S')
             header = rows[0] if rows else []
+            
             # Normalizar nombres de columnas
             def normaliza_columna(nombre):
                 if not nombre:
                     return ''
                 return str(nombre).strip().replace('\u200b', '').replace('\ufeff', '').lower()
+                
             # Buscar índices de columnas por nombre
             pedido_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'número de pedido'), 0)
             fecha_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'fecha/hora'), 1)
             caso_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'caso'), 2)
             email_col = next((i for i, h in enumerate(header) if normaliza_columna(h) == 'email'), 3)
             desc_col = next((i for i, h in enumerate(header) if 'observaciones' in normaliza_columna(h)), 4)
+            
             # Crear fila con datos en las posiciones correctas
             row_data = [''] * len(header)
             row_data[pedido_col] = pedido
@@ -117,20 +154,37 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
             row_data[caso_col] = f'#{caso}'
             row_data[email_col] = email
             row_data[desc_col] = descripcion
-            sheet.append_row(row_data)
+            
+            try:
+                sheet.append_row(row_data)
+            except Exception as e:
+                await interaction.followup.send(f'❌ Error al agregar datos a la hoja: {str(e)}', ephemeral=True)
+                return
+                
             parent_folder_id = getattr(config, 'PARENT_DRIVE_FOLDER_ID', None)
             if parent_folder_id:
-                state_manager.set_user_state(user_id, {"type": "facturaA", "pedido": pedido, "solicitud_id": solicitud_id, "timestamp": now.timestamp()}, "facturaA")
+                try:
+                    state_manager.set_user_state(user_id, {"type": "facturaA", "pedido": pedido, "solicitud_id": solicitud_id, "timestamp": now.timestamp()}, "facturaA")
+                except Exception as e:
+                    print(f"Error al guardar estado: {e}")
+                    
             confirmation_message = '✅ **Solicitud de Factura A cargada correctamente en Google Sheets.**'
             if parent_folder_id:
                 confirmation_message += '\n\n📎 **Próximo paso:** Envía los archivos adjuntos para esta solicitud en un **mensaje separado** aquí mismo en este canal.'
             else:
                 confirmation_message += '\n\n⚠️ La carga de archivos adjuntos a Google Drive no está configurada en el bot para Factura A.'
-            await interaction.response.send_message(confirmation_message, ephemeral=True)
+                
+            await interaction.followup.send(confirmation_message, ephemeral=True)
+            
         except Exception as error:
-            await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud de Factura A. Detalles: {error}', ephemeral=True)
-        if not interaction.response.is_done():
-            await interaction.response.send_message('✅ Tarea finalizada.', ephemeral=True)
+            print(f"Error en FacturaAModal.on_submit: {error}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud de Factura A. Detalles: {str(error)}', ephemeral=True)
+                else:
+                    await interaction.followup.send(f'❌ Hubo un error al procesar tu solicitud de Factura A. Detalles: {str(error)}', ephemeral=True)
+            except:
+                pass
 
 class FacturaBModal(discord.ui.Modal, title='Registrar Solicitud Factura B'):
     def __init__(self):
