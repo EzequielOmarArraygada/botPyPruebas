@@ -15,8 +15,8 @@ class FacturaAModal(discord.ui.Modal, title='Registrar Solicitud Factura A'):
     def __init__(self):
         super().__init__(custom_id='facturaAModal')
         self.pedido = discord.ui.TextInput(
-            label="Número de Pedido (Si es ML recordá cargar el número de pedido, no de carrito)",
-            placeholder="Ingresa el número de pedido...",
+            label="Número de Pedido",
+            placeholder="Si es ML, usa el número de pedido, no de carrito",
             custom_id="pedidoInput",
             style=discord.TextStyle.short,
             required=True,
