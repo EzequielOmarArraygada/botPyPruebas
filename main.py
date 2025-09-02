@@ -266,8 +266,8 @@ async def register_persistent_views():
     # Registrar view para solicitudes de Factura A
     bot.add_view(SolicitudCargadaView("placeholder", "placeholder", "placeholder", "placeholder", "placeholder"))
     
-    # Registrar view para solicitudes de Nota de Crédito
-    bot.add_view(NotaCreditoCargadaView("placeholder", "placeholder", "placeholder", "placeholder", "placeholder"))
+    # Registrar view para solicitudes de Nota de Crédito (sin placeholders)
+    # Las views se registran dinámicamente cuando se crean
     
     print("Views persistentes registradas correctamente")
     # except Exception as e:

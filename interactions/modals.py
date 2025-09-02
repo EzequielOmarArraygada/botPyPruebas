@@ -1646,7 +1646,7 @@ class ICBCModal(discord.ui.Modal, title='Registrar Solicitud ICBC'):
 
 class NotaCreditoModal(discord.ui.Modal, title='Registrar Nota de Crédito'):
     def __init__(self):
-        super().__init__(custom_id='notaCreditoModal')
+        super().__init__(custom_id=f'notaCreditoModal_{hash(str(datetime.now()))}')
         self.pedido = discord.ui.TextInput(
             label="Número de Pedido",
             placeholder="Ingresa el número de pedido...",
@@ -1685,9 +1685,21 @@ class NotaCreditoModal(discord.ui.Modal, title='Registrar Nota de Crédito'):
         self.add_item(self.caso)
         self.add_item(self.email)
         self.add_item(self.observaciones)
+    
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        """Manejar errores del modal"""
+        print(f'Error en NotaCreditoModal: {error}')
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message('❌ Error al procesar el formulario. Por favor, inténtalo de nuevo.', ephemeral=True)
+            else:
+                await interaction.followup.send('❌ Error al procesar el formulario. Por favor, inténtalo de nuevo.', ephemeral=True)
+        except:
+            print(f'No se pudo enviar mensaje de error del modal: {error}')
 
     async def on_submit(self, interaction: discord.Interaction):
-        
+        # Responder inmediatamente para evitar timeout
+        await interaction.response.defer(ephemeral=True)
         
         cleanup_expired_states()
         try:
@@ -1699,15 +1711,15 @@ class NotaCreditoModal(discord.ui.Modal, title='Registrar Nota de Crédito'):
             observaciones = self.observaciones.value.strip()
             
             if not pedido or not caso or not email:
-                await interaction.response.send_message('❌ Error: Los campos Pedido, Caso y Email son requeridos.', ephemeral=True)
+                await interaction.followup.send('❌ Error: Los campos Pedido, Caso y Email son requeridos.', ephemeral=True)
                 return
                 
             if not config.GOOGLE_CREDENTIALS_JSON:
-                await interaction.response.send_message('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
+                await interaction.followup.send('❌ Error: Las credenciales de Google no están configuradas.', ephemeral=True)
                 return
                 
             if not config.SPREADSHEET_ID_FAC_A:
-                await interaction.response.send_message('❌ Error: El ID de la hoja no está configurado.', ephemeral=True)
+                await interaction.followup.send('❌ Error: El ID de la hoja no está configurado.', ephemeral=True)
                 return
                 
             client = get_sheets_client()
@@ -1735,7 +1747,7 @@ class NotaCreditoModal(discord.ui.Modal, title='Registrar Nota de Crédito'):
             is_duplicate = check_if_pedido_exists(sheet, sheet_range_puro, pedido)
             
             if is_duplicate:
-                await interaction.response.send_message(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Nota de Crédito.', ephemeral=True)
+                await interaction.followup.send(f'❌ El número de pedido **{pedido}** ya se encuentra registrado en la hoja de Nota de Crédito.', ephemeral=True)
                 return
                 
             tz = pytz.timezone('America/Argentina/Buenos_Aires')
@@ -1808,11 +1820,18 @@ class NotaCreditoModal(discord.ui.Modal, title='Registrar Nota de Crédito'):
                     view=view
                 )
             
-            await interaction.response.send_message('✅ **Solicitud de Nota de Crédito registrada correctamente en Google Sheets.**', ephemeral=True)
+            await interaction.followup.send('✅ **Solicitud de Nota de Crédito registrada correctamente en Google Sheets.**', ephemeral=True)
             
         except Exception as error:
             print(f'Error en NotaCreditoModal: {error}')
-            await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
+            try:
+                await interaction.followup.send(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
+            except:
+                # Si falla el followup, intentar response normal
+                try:
+                    await interaction.response.send_message(f'❌ Hubo un error al procesar tu solicitud. Detalles: {error}', ephemeral=True)
+                except:
+                    print(f'No se pudo enviar mensaje de error al usuario: {error}')
 
 async def setup(bot):
     await bot.add_cog(Modals(bot)) 

@@ -358,7 +358,7 @@ class NotaCreditoCargadaButton(discord.ui.Button):
         super().__init__(
             label='Solicitud cargada',
             style=discord.ButtonStyle.success,
-            custom_id=f'nota_credito_cargada_{pedido}_{message_id}'
+            custom_id=f'nota_credito_cargada_{pedido}_{hash(f"{pedido}_{caso}_{fecha_carga}")}'
         )
         self.pedido = pedido
         self.caso = caso
@@ -484,12 +484,30 @@ class NotaCreditoCargadaButton(discord.ui.Button):
             
         except Exception as e:
             print(f'Error en NotaCreditoCargadaButton: {e}')
-            await interaction.response.send_message(f'❌ Error al confirmar la solicitud: {str(e)}', ephemeral=True)
+            try:
+                await interaction.response.send_message(f'❌ Error al confirmar la solicitud: {str(e)}', ephemeral=True)
+            except:
+                # Si la interacción ya expiró, intentar followup
+                try:
+                    await interaction.followup.send(f'❌ Error al confirmar la solicitud: {str(e)}', ephemeral=True)
+                except:
+                    print(f'No se pudo enviar mensaje de error al usuario: {e}')
 
 class NotaCreditoCargadaView(discord.ui.View):
     def __init__(self, pedido, caso, agente, fecha_carga, message_id):
         super().__init__(timeout=None)
         self.add_item(NotaCreditoCargadaButton(pedido, caso, agente, fecha_carga, message_id))
+    
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item) -> None:
+        """Manejar errores de la view"""
+        print(f'Error en NotaCreditoCargadaView: {error}')
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+            else:
+                await interaction.followup.send('❌ Error al procesar la solicitud. Por favor, inténtalo de nuevo.', ephemeral=True)
+        except:
+            print(f'No se pudo enviar mensaje de error: {error}')
 
 async def setup(bot):
     await bot.add_cog(AttachmentHandler(bot)) 
