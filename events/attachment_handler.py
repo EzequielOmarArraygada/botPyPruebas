@@ -464,15 +464,7 @@ class NotaCreditoCargadaButton(discord.ui.Button):
                 await interaction.response.send_message(f'❌ No se encontró el pedido {self.pedido} en la hoja.', ephemeral=True)
                 return
             
-            # Deshabilitar el botón
-            self.disabled = True
-            self.label = '✅ Confirmado'
-            self.style = discord.ButtonStyle.secondary
-            
-            # Actualizar el mensaje
-            await interaction.message.edit(view=self.view)
-            
-            # Enviar confirmación
+            # Enviar confirmación primero
             await interaction.response.send_message(
                 f'✅ **Solicitud de Nota de Crédito confirmada exitosamente.**\n'
                 f'📦 Pedido: {self.pedido}\n'
@@ -481,6 +473,21 @@ class NotaCreditoCargadaButton(discord.ui.Button):
                 f'📅 Fecha de confirmación: {fecha_hora_confirmacion}',
                 ephemeral=True
             )
+            
+            # Deshabilitar el botón después de responder
+            self.disabled = True
+            self.label = '✅ Confirmado'
+            self.style = discord.ButtonStyle.secondary
+            
+            # Actualizar el mensaje usando followup
+            try:
+                await interaction.followup.edit_message(interaction.message.id, view=self.view)
+            except:
+                # Si falla el followup, intentar edit normal
+                try:
+                    await interaction.message.edit(view=self.view)
+                except Exception as edit_error:
+                    print(f'Error al actualizar el botón: {edit_error}')
             
         except Exception as e:
             print(f'Error en NotaCreditoCargadaButton: {e}')
