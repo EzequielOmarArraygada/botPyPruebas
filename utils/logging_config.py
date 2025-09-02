@@ -5,21 +5,21 @@ Permite ajustar fácilmente los delays y parámetros de rate limiting
 
 # Configuración de rate limiting
 RATE_LIMIT_CONFIG = {
-    # Delays base (en segundos)
-    'base_delay': 2.0,           # Delay base entre mensajes
-    'max_delay': 30.0,           # Delay máximo cuando hay errores
-    'console_buffer_delay': 3.0, # Delay para agrupar mensajes de consola
+    # Delays base (en segundos) - Aumentados para reducir spam
+    'base_delay': 5.0,           # Delay base entre mensajes (aumentado)
+    'max_delay': 60.0,           # Delay máximo cuando hay errores (aumentado)
+    'console_buffer_delay': 10.0, # Delay para agrupar mensajes de consola (aumentado)
     
     # Configuración de retry
-    'max_retries': 3,            # Máximo número de reintentos
-    'retry_delay': 5.0,          # Delay inicial para retry
-    'max_retry_delay': 60.0,     # Delay máximo para retry
+    'max_retries': 2,            # Máximo número de reintentos (reducido)
+    'retry_delay': 10.0,         # Delay inicial para retry (aumentado)
+    'max_retry_delay': 120.0,    # Delay máximo para retry (aumentado)
     
     # Configuración de errores consecutivos
-    'max_consecutive_errors': 5, # Máximo errores consecutivos antes de aumentar delay
+    'max_consecutive_errors': 3, # Máximo errores consecutivos antes de aumentar delay (reducido)
     
     # Configuración de cola de mensajes
-    'message_timeout': 3600,     # Tiempo máximo que un mensaje puede estar en cola (1 hora)
+    'message_timeout': 1800,     # Tiempo máximo que un mensaje puede estar en cola (30 min, reducido)
     
     # Configuración de prioridades
     'priorities': {
@@ -41,7 +41,18 @@ FILTER_CONFIG = {
         'rate limiting', 
         'responded with 429',
         'retrying in',
-        'done sleeping for the rate limit'
+        'done sleeping for the rate limit',
+        'Bot desconectado',
+        'Bot conectado',
+        'Bot reconectado',
+        'Verificación de errores',
+        'Verificando hoja',
+        'Verificación completada',
+        'Iniciando verificación',
+        'Tarea check_errors',
+        'Extension cargada',
+        'Comandos sincronizados',
+        'Views persistentes registradas'
     ],
     
     # Loggers a filtrar (solo se muestran errores)

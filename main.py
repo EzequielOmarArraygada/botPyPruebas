@@ -97,6 +97,10 @@ async def check_errors():
         print("⚠️ Verificación de errores omitida: instancia de Sheets no disponible")
         return
     
+    if not bot.is_ready():
+        print("⚠️ Verificación de errores omitida: bot no está listo")
+        return
+    
     try:
         if not config.SPREADSHEET_ID_CASOS:
             print("Error: SPREADSHEET_ID_CASOS no está configurado")
@@ -104,10 +108,17 @@ async def check_errors():
         if not config.GUILD_ID:
             print("Error: GUILD_ID no está configurado")
             return
+        
+        print(f"🔍 Iniciando verificación de errores en {len(config.MAPA_RANGOS_ERRORES)} rangos...")
         spreadsheet = sheets_instance.open_by_key(config.SPREADSHEET_ID_CASOS)
+        
+        errores_encontrados = 0
+        hojas_verificadas = 0
+        
         for sheet_range, channel_id in config.MAPA_RANGOS_ERRORES.items():
             if not sheet_range or not channel_id:
                 continue
+                
             hoja_nombre = None
             sheet_range_puro = sheet_range
             if '!' in sheet_range:
@@ -115,15 +126,16 @@ async def check_errors():
                 if len(partes) == 2:
                     hoja_nombre = partes[0].strip("'")
                     sheet_range_puro = partes[1]
+            
             try:
                 if hoja_nombre:
                     sheet = spreadsheet.worksheet(hoja_nombre)
                 else:
                     sheet = spreadsheet.sheet1
-            except Exception as sheet_error:
-                print(f"Error al abrir la hoja {hoja_nombre or '[default]'}: {sheet_error}")
-                continue
-            try:
+                    
+                hojas_verificadas += 1
+                print(f"📊 Verificando hoja: {hoja_nombre or '[default]'} (Rango: {sheet_range})")
+                
                 from utils.google_sheets import check_sheet_for_errors
                 await check_sheet_for_errors(
                     bot,
@@ -132,10 +144,17 @@ async def check_errors():
                     int(channel_id),
                     int(config.GUILD_ID)
                 )
-            except Exception as error:
-                print(f"Error al verificar errores en el rango {sheet_range}: {error}")
+                
+            except Exception as sheet_error:
+                print(f"❌ Error al verificar hoja {hoja_nombre or '[default]'}: {sheet_error}")
+                errores_encontrados += 1
+                continue
+        
+        print(f"✅ Verificación completada: {hojas_verificadas} hojas verificadas, {errores_encontrados} errores")
+        
     except Exception as error:
-        print(f"Error en la verificación periódica: {error}")
+        print(f"❌ Error crítico en la verificación periódica: {error}")
+        # No enviar este error a Discord para evitar spam
 
 @check_errors.before_loop
 async def before_check_errors():
@@ -172,6 +191,41 @@ async def on_disconnect():
             print("Tarea check_errors detenida.")
     except Exception as e:
         print(f"Error al detener tareas: {e}")
+
+@bot.event
+async def on_connect():
+    """Manejador cuando el bot se conecta"""
+    print("Bot conectado a Discord.")
+
+@bot.event
+async def on_resumed():
+    """Manejador cuando el bot se reconecta después de una desconexión"""
+    print("Bot reconectado. Reiniciando tareas...")
+    try:
+        # Reiniciar la tarea de verificación de errores si no está ejecutándose
+        if not check_errors.is_running():
+            if (config.SPREADSHEET_ID_CASOS and config.MAPA_RANGOS_ERRORES and 
+                config.GUILD_ID and sheets_instance):
+                print("Reiniciando verificación periódica de errores...")
+                check_errors.start()
+            else:
+                print("No se puede reiniciar verificación de errores: configuración incompleta")
+    except Exception as e:
+        print(f"Error al reiniciar tareas: {e}")
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    """Manejador global de errores con mejor logging"""
+    import traceback
+    error_info = traceback.format_exc()
+    print(f"Error en evento {event}: {error_info}")
+    
+    # No enviar todos los errores a Discord para evitar spam
+    if "rate limit" not in error_info.lower() and "429" not in error_info:
+        try:
+            log_exception(bot, Exception(f"Error en evento {event}: {error_info}"), f"Evento: {event}")
+        except:
+            pass
 
 # Cargar eventos y comandos
 async def load_extensions():

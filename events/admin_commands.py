@@ -809,6 +809,23 @@ class AdminCommands(commands.Cog):
                 inline=True
             )
 
+            # Estado de la tarea de verificación de errores
+            from main import check_errors
+            task_status = '✅ Ejecutándose' if check_errors.is_running() else '❌ Detenida'
+            embed.add_field(
+                name='🔍 Verificación de errores',
+                value=task_status,
+                inline=True
+            )
+
+            # Intervalo de verificación
+            from config import ERROR_CHECK_INTERVAL_MIN
+            embed.add_field(
+                name='⏰ Intervalo de verificación',
+                value=f'{ERROR_CHECK_INTERVAL_MIN} minutos',
+                inline=True
+            )
+
             embed.set_footer(text=f'Solicitado por {interaction.user.display_name}')
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -818,6 +835,57 @@ class AdminCommands(commands.Cog):
                 f'❌ **Error al obtener estado**\n\n```{str(e)}```',
                 ephemeral=True
             )
+
+    @app_commands.guilds(discord.Object(id=int(config.GUILD_ID)))
+    @app_commands.command(name='restart_error_check', description='🔄 Reinicia la tarea de verificación de errores (solo admins)')
+    async def restart_error_check(self, interaction: discord.Interaction):
+        """Comando para reiniciar la tarea de verificación de errores"""
+        
+        # Verificar permisos de administrador o usuario autorizado
+        if not interaction.user.guild_permissions.administrator and str(interaction.user.id) not in config.SETUP_USER_IDS:
+            await interaction.response.send_message(
+                '❌ **Acceso denegado**\n\n'
+                'Solo los administradores o usuarios autorizados pueden usar este comando.',
+                ephemeral=True
+            )
+            return
+
+        try:
+            from main import check_errors
+            
+            # Detener la tarea si está ejecutándose
+            if check_errors.is_running():
+                check_errors.cancel()
+                await asyncio.sleep(2)  # Esperar a que se detenga completamente
+            
+            # Verificar que el bot tenga las instancias necesarias
+            if not hasattr(self.bot, 'sheets_instance') or not self.bot.sheets_instance:
+                await interaction.response.send_message(
+                    '❌ **Error**\n\n'
+                    'No se puede reiniciar la verificación de errores: instancia de Google Sheets no disponible.\n'
+                    'Usa `/reset_bot` para reinicializar todas las conexiones.',
+                    ephemeral=True
+                )
+                return
+            
+            # Reiniciar la tarea
+            check_errors.start()
+            
+            await interaction.response.send_message(
+                '✅ **Tarea de verificación de errores reiniciada**\n\n'
+                f'La verificación se ejecutará cada {config.ERROR_CHECK_INTERVAL_MIN} minutos.\n'
+                'Usa `/bot_status` para verificar el estado.',
+                ephemeral=True
+            )
+            
+            print(f'[ADMIN] Tarea de verificación de errores reiniciada por {interaction.user} ({interaction.user.id})')
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f'❌ **Error al reiniciar la tarea**\n\n```{str(e)}```',
+                ephemeral=True
+            )
+            print(f'[ADMIN] Error al reiniciar tarea de verificación: {e}')
 
 async def setup(bot):
     await bot.add_cog(AdminCommands(bot)) 
