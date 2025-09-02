@@ -36,6 +36,7 @@ async def on_ready():
             'events.interaction_commands', 
             'events.interaction_selects',
             'events.attachment_handler',
+            'events.links_panel',
             'interactions.modals',
             'interactions.select_menus',
             'tasks.panel'
