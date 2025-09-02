@@ -232,14 +232,14 @@ class RealTimeView(discord.ui.View):
         
         self.add_item(discord.ui.Button(
             label="Formulario Salida de Línea",
-            url="https://sites.google.com/wearesolu.com/portal-workforce/inicio/workforce/estado-de-solicitudes-wfm?authuser=0",
+            url="https://docs.google.com/forms/d/e/1FAIpQLSf_OsQgq5vP9yJNtRVVUqLVo-qf3JaR-YkADZSX1N1MYWU-Pw/viewform",
             style=discord.ButtonStyle.danger,
             emoji="🚪"
         ))
         
         self.add_item(discord.ui.Button(
             label="Solicitud Solu Swap",
-            url="https://sites.google.com/wearesolu.com/portal-workforce/inicio/workforce/estado-de-solicitudes-wfm?authuser=0",
+            url="https://docs.google.com/forms/d/e/1FAIpQLSeHh9px-OqkMDbGX0MAH8jAsGQI6aHlk7xuqpXwTJ-VdQIcXg/viewform",
             style=discord.ButtonStyle.danger,
             emoji="🔄"
         ))
