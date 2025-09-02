@@ -22,43 +22,6 @@ class LinksPanel(commands.Cog):
             return
 
         try:
-            # Crear embed principal
-            embed = discord.Embed(
-                title="📋 Links Útiles",
-                description="Acceso rápido a herramientas y recursos del equipo",
-                color=0x00FF00,
-                timestamp=discord.utils.utcnow()
-            )
-            
-            embed.add_field(
-                name="🔧 Plataformas de Gestión",
-                value="Herramientas principales para la gestión de pedidos y casos",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🚚 Plataformas de Envío",
-                value="Sistemas de tracking y gestión de envíos",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="📚 Información para la Gestión",
-                value="Documentación, manuales y recursos de consulta",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="⚡ Real Time",
-                value="Herramientas de tiempo real y reportes",
-                inline=False
-            )
-            
-            embed.set_footer(text="Panel de Links Útiles - BGH")
-
-            # Crear la vista con botones organizados por grupos
-            view = LinksPanelView()
-
             # Enviar el panel al canal configurado
             canal = self.bot.get_channel(config.TARGET_CHANNEL_ID_LINKS)
             if not canal:
@@ -68,7 +31,51 @@ class LinksPanel(commands.Cog):
                 )
                 return
 
-            await canal.send(embed=embed, view=view)
+            # Crear y enviar 4 paneles separados
+            
+            # Panel 1: Plataformas de Gestión
+            embed1 = discord.Embed(
+                title="🔧 Plataformas de Gestión",
+                description="Herramientas principales para la gestión de pedidos y casos",
+                color=0x3498db,
+                timestamp=discord.utils.utcnow()
+            )
+            embed1.set_footer(text="Panel de Links Útiles - BGH")
+            view1 = PlataformasGestionView()
+            await canal.send(embed=embed1, view=view1)
+
+            # Panel 2: Plataformas de Envío
+            embed2 = discord.Embed(
+                title="🚚 Plataformas de Envío",
+                description="Sistemas de tracking y gestión de envíos",
+                color=0x95a5a6,
+                timestamp=discord.utils.utcnow()
+            )
+            embed2.set_footer(text="Panel de Links Útiles - BGH")
+            view2 = PlataformasEnvioView()
+            await canal.send(embed=embed2, view=view2)
+
+            # Panel 3: Información para la Gestión
+            embed3 = discord.Embed(
+                title="📚 Información para la Gestión",
+                description="Documentación, manuales y recursos de consulta",
+                color=0x2ecc71,
+                timestamp=discord.utils.utcnow()
+            )
+            embed3.set_footer(text="Panel de Links Útiles - BGH")
+            view3 = InformacionGestionView()
+            await canal.send(embed=embed3, view=view3)
+
+            # Panel 4: Real Time
+            embed4 = discord.Embed(
+                title="⚡ Real Time",
+                description="Herramientas de tiempo real y reportes",
+                color=0xe74c3c,
+                timestamp=discord.utils.utcnow()
+            )
+            embed4.set_footer(text="Panel de Links Útiles - BGH")
+            view4 = RealTimeView()
+            await canal.send(embed=embed4, view=view4)
             
             await interaction.response.send_message(
                 f'✅ **Panel de links útiles publicado correctamente** en <#{config.TARGET_CHANNEL_ID_LINKS}>',
@@ -84,11 +91,11 @@ class LinksPanel(commands.Cog):
             )
             print(f'[LINKS] Error al publicar panel: {e}')
 
-class LinksPanelView(discord.ui.View):
+# Panel 1: Plataformas de Gestión
+class PlataformasGestionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         
-        # Grupo 1: Plataformas de Gestión
         self.add_item(discord.ui.Button(
             label="Wise",
             url="https://login.wcx.cloud/",
@@ -124,7 +131,11 @@ class LinksPanelView(discord.ui.View):
             emoji="🧾"
         ))
 
-        # Grupo 2: Plataformas de Envío
+# Panel 2: Plataformas de Envío
+class PlataformasEnvioView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        
         self.add_item(discord.ui.Button(
             label="Entregar Búsqueda",
             url="https://svr.entregar.net.ar/e_transport/app_Login/app_Login.php",
@@ -153,7 +164,11 @@ class LinksPanelView(discord.ui.View):
             emoji="🏍️"
         ))
 
-        # Grupo 3: Información para la Gestión
+# Panel 3: Información para la Gestión
+class InformacionGestionView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        
         self.add_item(discord.ui.Button(
             label="Manual BGH Front",
             url="https://docs.google.com/document/d/1fSEHllwd6CrBTg17TujlcT39eVHonvFkvYMn4QLeI_4/edit?tab=t.akuk112mktt#heading=h.7lf2mo1kh90l",
@@ -182,7 +197,11 @@ class LinksPanelView(discord.ui.View):
             emoji="📑"
         ))
 
-        # Grupo 4: Real Time
+# Panel 4: Real Time
+class RealTimeView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        
         self.add_item(discord.ui.Button(
             label="Reporting",
             url="https://sites.google.com/wearesolu.com/portal-workforce/inicio/reporting?authuser=0",
