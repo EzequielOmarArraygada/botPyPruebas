@@ -164,7 +164,7 @@ class InteractionCommands(commands.Cog):
                 fecha_entrega = clean_html(info.get('fechaEstimadaDeEntrega', ''))
                 
                 # Generar link de Andreani
-                andreani_link = f"https://www.andreani.com/ar/rastreo/{tracking_number}"
+                andreani_link = f"https://www.andreani.com/envio/{tracking_number}"
                 
                 tracking_info = f"📦 Estado del tracking {tracking_number}:\n{estado} - {fecha_entrega}\n\n"
                 tracking_info += f"🔗 **Ver en Andreani:** {andreani_link}\n\n"
@@ -192,7 +192,7 @@ class InteractionCommands(commands.Cog):
                     tracking_info += "Historial: No disponible\n"
             else:
                 # Generar link de Andreani incluso si no se encuentra la info
-                andreani_link = f"https://www.andreani.com/ar/rastreo/{tracking_number}"
+                andreani_link = f"https://www.andreani.com/envio/{tracking_number}"
                 tracking_info = f"😕 No se pudo encontrar la información de tracking para **{tracking_number}**.\n\n"
                 tracking_info += f"🔗 **Ver en Andreani:** {andreani_link}"
         except ValueError as ve:
